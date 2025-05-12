@@ -18,7 +18,11 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ### Installer les dépendances du projet
 
-#### Si vous avez une carte graphique NVIDIA
+```
+uv sync
+```
+
+<!-- #### Si vous avez une carte graphique NVIDIA
 
 ```
 uv sync --extra cu128
@@ -34,4 +38,4 @@ uv sync --extra xpu
 
 ```
 uv sync --extra cpu
-```
+``` -->
