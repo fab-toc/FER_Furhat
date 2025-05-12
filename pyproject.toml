@@ -5,7 +5,6 @@ description = "Facial expression recognition using deep learning"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "kagglehub>=0.3.12",
     "matplotlib>=3.10.3",
     "numpy>=2.2.5",
     "pandas>=2.2.3",
@@ -14,4 +13,4 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ipykernel>=6.29.5"]
+dev = ["ipykernel>=6.29.5", "ipywidgets>=8.1.7"]
