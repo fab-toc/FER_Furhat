@@ -21,7 +21,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 #### Si vous avez une carte graphique NVIDIA
 
 ```
-uv sync --extra cu124
+uv sync --extra cu128
 ```
 
 #### Si vous avez une carte graphique Intel
