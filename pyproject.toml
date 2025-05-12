@@ -7,9 +7,9 @@ requires-python = ">=3.13"
 dependencies = []
 
 [project.optional-dependencies]
-cpu = ["torch>=2.7.0", "torchvision>=0.22.0"]
-cu128 = ["torch>=2.7.0", "torchvision>=0.22.0"]
-xpu = ["torch>=2.7.0", "torchvision>=0.22.0"]
+cpu = ["torch", "torchvision"]
+cu128 = ["torch", "torchvision"]
+xpu = ["torch", "torchvision"]
 
 
 [tool.uv]
