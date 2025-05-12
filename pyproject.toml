@@ -6,6 +6,11 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = []
 
+[project.optional-dependencies]
+cpu = ["torch>=2.7.0", "torchvision>=0.22.0"]
+cu124 = ["torch>=2.7.0", "torchvision>=0.22.0"]
+xpu = ["torch>=2.7.0", "torchvision>=0.22.0"]
+
 
 [tool.uv]
 conflicts = [[{ extra = "cpu" }, { extra = "cu124" }, { extra = "xpu" }]]
