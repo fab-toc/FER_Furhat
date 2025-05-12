@@ -1,5 +1,9 @@
 # TPE ISSD
 
+## Description du projet
+
+Ce projet vise à implémenter un algorithme de reconnaissance de certaines expressions faciales acquises avec la caméra du robot humanoïde Furhat (https://www.furhatrobotics.com/) et à à oraliser les réponses et/ou réagir avec le robot (feedback). Ces expressions sont à choisir entre les expressions que le robot peut exprimer (surprise, sourire par exemple).
+
 ## Installation
 
 ### Installer uv
