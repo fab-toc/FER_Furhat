@@ -51,10 +51,10 @@ train_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=24,
+    num_workers=8,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=3,
+    prefetch_factor=2,
 )
 
 test_dataloader = DataLoader(
@@ -62,10 +62,10 @@ test_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=24,
+    num_workers=8,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=3,
+    prefetch_factor=2,
 )
 
 # - print the number of batches in the training subset
@@ -135,10 +135,10 @@ train_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=24,
+    num_workers=8,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=3,
+    prefetch_factor=2,
 )
 
 test_dataloader = DataLoader(
@@ -146,10 +146,10 @@ test_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=24,
+    num_workers=8,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=3,
+    prefetch_factor=2,
 )
 
 # - print the number of batches in the training subset
@@ -215,11 +215,11 @@ test_accuracy = eval_classifier(
 # - Print the test accuracy
 print("Test accuracy: {:.2f}%".format(test_accuracy))
 
-# - Plot the training loss over epochs
-plt.figure()
-plt.plot(train_losses)
-plt.title("Training loss over epochs")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.grid()
-plt.show()
+# # - Plot the training loss over epochs
+# plt.figure()
+# plt.plot(train_losses)
+# plt.title("Training loss over epochs")
+# plt.xlabel("Epoch")
+# plt.ylabel("Loss")
+# plt.grid()
+# plt.show()

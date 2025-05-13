@@ -97,6 +97,8 @@ def eval_classifier(
     # Set the model in 'evaluation' mode (this disables some layers (batch norm, dropout...) which are not needed when testing)
     model.eval()
 
+    model.to(device, non_blocking=True)
+
     # In evaluation phase, we don't need to compute gradients (for memory efficiency)
     with torch.no_grad():
         # initialize the total and correct number of labels to compute the accuracy
