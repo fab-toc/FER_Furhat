@@ -24,9 +24,15 @@ data_transforms = torchvision.transforms.Compose(
         torchvision.transforms.Grayscale(
             num_output_channels=3
         ),  # si modèles pré-entraînés ImageNet
+        torchvision.transforms.RandomHorizontalFlip(),  # Retournement aléatoire
+        torchvision.transforms.RandomRotation(10),  # Rotation légère
+        torchvision.transforms.RandomAffine(0, translate=(0.1, 0.1)),  # Translation
         torchvision.transforms.Resize((224, 224)),  # ou autre résolution
         torchvision.transforms.ToTensor(),
-        # torchvision.transforms.Normalize(mean=mean, std=std),
+        # Utiliser les statistiques d'ImageNet
+        torchvision.transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        ),
     ]
 )
 
@@ -80,13 +86,13 @@ num_batches = len(test_dataloader)
 print("Number of batches in the testing subset:", num_batches)
 
 
-weights = torchvision.models.VGG19_Weights.IMAGENET1K_V1
-model = torchvision.models.vgg19(
+weights = torchvision.models.VGG11_Weights.IMAGENET1K_V1
+model = torchvision.models.vgg11(
     weights=weights
 )  # charges les poids ImageNet pré-entraînés
 
 # 1. Geler uniquement les premiers blocs convolutifs (features[0:28])
-# VGG-19 a 5 blocs convolutifs, gardons les 2 derniers entraînables
+# VGG-11 a 5 blocs convolutifs, gardons les 2 derniers entraînables
 for param in model.features[:28].parameters():  # Blocs 1-3 gelés
     param.requires_grad = False
 
@@ -103,7 +109,7 @@ model.classifier[6] = nn.Linear(in_features=4096, out_features=num_classes)
 
 
 num_epochs = 30
-learning_rate = 0.0005
+learning_rate = 0.00005
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -119,10 +125,10 @@ model_trained, train_losses = train_classifier(
     verbose=True,
 )
 
-torch.save(model_trained.state_dict(), "training/vgg-19_trained.pt")
+torch.save(model_trained.state_dict(), "training/vgg-11_trained.pt")
 
 model_test = copy.deepcopy(model)
-model_test.load_state_dict(torch.load("training/vgg-19_trained.pt"))
+model_test.load_state_dict(torch.load("training/vgg-11_trained.pt"))
 
 # - Apply the evaluation function using the test dataloader
 test_accuracy = eval_classifier(
