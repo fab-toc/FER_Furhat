@@ -26,7 +26,11 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 #### Identifier la version de CUDA
 
-Pour savoir quelle version de CUDA vous avez, exécutez la commande suivante...
+Sous Linux, exécutez la commande suivante et notez la version de CUDA affichée :
+
+```
+nvidia-smi
+```
 
 #### Pour CUDA 11.8
 
