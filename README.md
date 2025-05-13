@@ -22,7 +22,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ## Installer les dépendances en fonction de sa carte graphique
 
-### Pour une carte graphique NVIDIA
+### Si vous avez une carte graphique NVIDIA
 
 #### Identifier la version de CUDA
 
@@ -64,7 +64,7 @@ uv sync --extra cu128
 uv sync --extra rocm
 ```
 
-### Si vous avez une carte graphique Intel
+### Si vous avez une carte graphique INTEL
 
 (uniquement compatible sous Linux et Windows, limitation de PyTorch)
 
