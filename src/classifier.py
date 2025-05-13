@@ -1,5 +1,6 @@
 import copy
 from typing import Callable, Optional
+from torch.amp import GradScaler, autocast
 
 import torch
 import torch.nn as nn
@@ -21,7 +22,10 @@ def train_classifier(
     model_tr = copy.deepcopy(model)
 
     # Move the model to the specified device (GPU or CPU)
-    model_tr = model_tr.to(device)
+    model_tr = model_tr.to(device, non_blocking=True)
+
+    # Create a GradScaler to handle dynamic scale of loss
+    scaler = GradScaler()
 
     # Set the model to training mode, this is important for models that have layers like dropout or batch normalization
     model_tr.train()
@@ -46,20 +50,22 @@ def train_classifier(
             if transform_fn is not None:
                 images = transform_fn(images)
 
-            # - calculate the predicted labels from the images using 'model_tr'
-            labels_pred = model_tr(images)
+            with autocast("cuda"):
+                # - calculate the predicted labels from the images using 'model_tr'
+                labels_pred = model_tr(images)
 
-            # - using loss_fn, calculate the 'loss' between the predicted and true labels
-            loss = loss_fn(labels_pred, labels)
+                # - using loss_fn, calculate the 'loss' between the predicted and true labels
+                loss = loss_fn(labels_pred, labels)
 
             # - set the optimizer gradients at 0 for safety
             optimizer.zero_grad()
 
             # - compute the gradients (use the 'backward' method on 'loss')
-            loss.backward()
+            scaler.scale(loss).backward()
 
             # - apply the gradient descent algorithm (perform a step of the optimizer)
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
 
             # Update the current epoch loss
             # Note that 'loss.item()' is the loss averaged over the batch, so multiply it with the current batch size to get the total batch loss
