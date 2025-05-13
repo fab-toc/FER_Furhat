@@ -3,8 +3,6 @@ from typing import Callable, Optional
 
 import torch
 import torch.nn as nn
-from torch.amp.autocast_mode import autocast
-from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader
 
 
@@ -15,7 +13,6 @@ def train_classifier(
     num_epochs: int,
     loss_fn: nn.Module,
     optimizer: torch.optim.Optimizer,
-    learning_rate: float,
     device: torch.device,
     transform_fn: Optional[Callable] = None,
     verbose: bool = True,
@@ -25,15 +22,6 @@ def train_classifier(
 
     # Move the model to the specified device (GPU or CPU)
     model_tr = model_tr.to(device, non_blocking=True)
-
-    # Create a GradScaler to handle dynamic scale of loss
-    scaler = GradScaler(
-        init_scale=2**10,  # Valeur d'échelle initiale
-        growth_factor=2.0,  # Facteur de croissance si pas d'inf/nan
-        backoff_factor=0.5,  # Facteur de réduction si inf/nan détecté
-        growth_interval=2000,  # Nombre d'étapes réussies avant d'augmenter l'échelle
-        enabled=True,
-    )
 
     # Set the model to training mode, this is important for models that have layers like dropout or batch normalization
     model_tr.train()
@@ -55,33 +43,20 @@ def train_classifier(
             if transform_fn is not None:
                 images = transform_fn(images)
 
-            with autocast("cuda"):
-                # - calculate the predicted labels from the images using 'model_tr'
-                labels_pred = model_tr(images)
+            # - calculate the predicted labels from the images using 'model_tr'
+            labels_pred = model_tr(images)
 
-                # - using loss_fn, calculate the 'loss' between the predicted and true labels
-                loss = loss_fn(labels_pred, labels)
+            # - using loss_fn, calculate the 'loss' between the predicted and true labels
+            loss = loss_fn(labels_pred, labels)
 
             # - set the optimizer gradients at 0 for safety
             optimizer.zero_grad(set_to_none=True)
 
             # - compute the gradients (use the 'backward' method on 'loss')
-            scaler.scale(loss).backward()
-
-            # Désescalade pour le gradient clipping
-            scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(model_tr.parameters(), max_norm=1.0)
+            loss.backward()
 
             # - apply the gradient descent algorithm (perform a step of the optimizer)
-            scaler.step(optimizer)
-
-            # Gestion sécurisée de la mise à jour du scaler
-            try:
-                scaler.update()
-            except RuntimeError as e:
-                print(f"Warning: {e}. Continuing with training...")
-                # Réinitialisation du scaler si nécessaire
-                scaler = GradScaler(init_scale=2**10, enabled=True)
+            optimizer.step()
 
             # Update the current epoch loss
             # Note that 'loss.item()' is the loss averaged over the batch, so multiply it with the current batch size to get the total batch loss

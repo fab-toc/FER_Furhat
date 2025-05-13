@@ -12,7 +12,6 @@ from classifier import eval_classifier, train_classifier
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.allow_tf32 = True
 
@@ -48,17 +47,17 @@ print("Number of test samples:", len(test_data))
 for idx, emotion in enumerate(train_data.classes):
     print(f"Label {idx} → {emotion}")
 
-batch_size = 1024
+batch_size = 512
 
 train_dataloader = DataLoader(
     train_data,
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=16,
+    num_workers=12,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=8,
+    prefetch_factor=6,
 )
 
 test_dataloader = DataLoader(
@@ -66,10 +65,10 @@ test_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=16,
+    num_workers=12,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=8,
+    prefetch_factor=6,
 )
 
 # - print the number of batches in the training subset
@@ -104,16 +103,9 @@ model.classifier[6] = nn.Linear(in_features=4096, out_features=num_classes)
 
 
 num_epochs = 30
-learning_rate = 0.001
+learning_rate = 0.0005
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(
-    [
-        {"params": model.features[28:].parameters(), "lr": learning_rate / 10},
-        {"params": model.classifier[:-1].parameters(), "lr": learning_rate / 10},
-        {"params": model.classifier[-1].parameters(), "lr": learning_rate},
-    ],
-    fused=True,
-)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 model_trained, train_losses = train_classifier(
     model=model,
@@ -122,7 +114,6 @@ model_trained, train_losses = train_classifier(
     num_epochs=num_epochs,
     loss_fn=loss_fn,
     optimizer=optimizer,
-    learning_rate=learning_rate,
     device=device,
     transform_fn=None,
     verbose=True,
@@ -132,7 +123,6 @@ torch.save(model_trained.state_dict(), "training/vgg-19_trained.pt")
 
 model_test = copy.deepcopy(model)
 model_test.load_state_dict(torch.load("training/vgg-19_trained.pt"))
-# model_test = torch.compile(model_test, mode="reduce-overhead")
 
 # - Apply the evaluation function using the test dataloader
 test_accuracy = eval_classifier(
