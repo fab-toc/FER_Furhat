@@ -13,6 +13,7 @@ def train_classifier(
     num_epochs: int,
     loss_fn: nn.Module,
     optimizer: torch.optim.Optimizer,
+    learning_rate: float,
     device: torch.device,
     transform_fn: Optional[Callable] = None,
     verbose: bool = True,
@@ -25,6 +26,8 @@ def train_classifier(
 
     # Set the model to training mode, this is important for models that have layers like dropout or batch normalization
     model_tr.train()
+
+    optimizer = optimizer(model_tr.features(), lr=learning_rate)
 
     # Initialize a list for storing the training loss over epochs
     train_losses = []
