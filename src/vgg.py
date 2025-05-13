@@ -132,7 +132,7 @@ torch.save(model_trained.state_dict(), "training/vgg-19_trained.pt")
 
 model_test = copy.deepcopy(model)
 model_test.load_state_dict(torch.load("training/vgg-19_trained.pt"))
-model = torch.compile(model, mode="reduce-overhead")
+# model_test = torch.compile(model_test, mode="reduce-overhead")
 
 # - Apply the evaluation function using the test dataloader
 test_accuracy = eval_classifier(

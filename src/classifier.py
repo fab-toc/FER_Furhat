@@ -27,13 +27,16 @@ def train_classifier(
     model_tr = model_tr.to(device, non_blocking=True)
 
     # Create a GradScaler to handle dynamic scale of loss
-    scaler = GradScaler()
+    scaler = GradScaler(
+        init_scale=2**10,  # Valeur d'échelle initiale
+        growth_factor=2.0,  # Facteur de croissance si pas d'inf/nan
+        backoff_factor=0.5,  # Facteur de réduction si inf/nan détecté
+        growth_interval=2000,  # Nombre d'étapes réussies avant d'augmenter l'échelle
+        enabled=True,
+    )
 
     # Set the model to training mode, this is important for models that have layers like dropout or batch normalization
     model_tr.train()
-
-    # # Initialize the optimizer
-    # optimizer = torch.optim.Adam(model_tr.parameters(), lr=learning_rate, fused=True)
 
     # Initialize a list for storing the training loss over epochs
     train_losses = []
@@ -65,9 +68,20 @@ def train_classifier(
             # - compute the gradients (use the 'backward' method on 'loss')
             scaler.scale(loss).backward()
 
+            # Désescalade pour le gradient clipping
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model_tr.parameters(), max_norm=1.0)
+
             # - apply the gradient descent algorithm (perform a step of the optimizer)
             scaler.step(optimizer)
-            scaler.update()
+
+            # Gestion sécurisée de la mise à jour du scaler
+            try:
+                scaler.update()
+            except RuntimeError as e:
+                print(f"Warning: {e}. Continuing with training...")
+                # Réinitialisation du scaler si nécessaire
+                scaler = GradScaler(init_scale=2**10, enabled=True)
 
             # Update the current epoch loss
             # Note that 'loss.item()' is the loss averaged over the batch, so multiply it with the current batch size to get the total batch loss
