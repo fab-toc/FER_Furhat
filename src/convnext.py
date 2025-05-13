@@ -1,0 +1,144 @@
+import copy
+
+import kagglehub
+import torch
+import torch.nn as nn
+import torchvision
+from torch.utils.data import DataLoader
+
+# import matplotlib.pyplot as plt
+from classifier import eval_classifier, train_classifier
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.allow_tf32 = True
+
+
+# Download FER-2013 latest version
+data_dir = kagglehub.dataset_download("msambare/fer2013")
+
+data_transforms = torchvision.transforms.Compose(
+    [
+        torchvision.transforms.Grayscale(
+            num_output_channels=3
+        ),  # si modèles pré-entraînés ImageNet
+        torchvision.transforms.RandomHorizontalFlip(),  # Retournement aléatoire
+        torchvision.transforms.RandomRotation(10),  # Rotation légère
+        torchvision.transforms.RandomAffine(0, translate=(0.1, 0.1)),  # Translation
+        torchvision.transforms.Resize((224, 224)),  # ou autre résolution
+        torchvision.transforms.ColorJitter(brightness=0.2, contrast=0.2),
+        torchvision.transforms.ToTensor(),
+        # Utiliser les statistiques d'ImageNet
+        torchvision.transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        ),
+    ]
+)
+
+# Load the FER-2013 dataset
+train_data = torchvision.datasets.ImageFolder(
+    data_dir + "/train", transform=data_transforms
+)
+
+test_data = torchvision.datasets.ImageFolder(
+    data_dir + "/test", transform=data_transforms
+)
+
+print("Classes of the dataset:", train_data.classes)
+print("Number of training samples:", len(train_data))
+print("Number of test samples:", len(test_data))
+
+# Pour afficher le mapping complet
+for idx, emotion in enumerate(train_data.classes):
+    print(f"Label {idx} → {emotion}")
+
+batch_size = 64
+
+train_dataloader = DataLoader(
+    train_data,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+    num_workers=12,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=6,
+)
+
+test_dataloader = DataLoader(
+    test_data,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+    num_workers=12,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=6,
+)
+
+# - print the number of batches in the training subset
+num_batches = len(train_dataloader)
+print("Number of batches in the training subset:", num_batches)
+
+# - print the number of batches in the testing subset
+num_batches = len(test_dataloader)
+print("Number of batches in the testing subset:", num_batches)
+
+
+weights = torchvision.models.ConvNeXt_Base_Weights.IMAGENET1K_V1
+model = torchvision.models.convnext_base(
+    weights=weights
+)  # charges les poids ImageNet pré-entraînés
+
+
+# 1. Geler uniquement les premiers blocs convolutifs (features)
+for param in model.features.parameters():
+    param.requires_grad = False
+
+for param in model.classifier.parameters():
+    param.requires_grad = True
+
+# Remplacer la couche de sortie (le dernier module du classifier)
+num_classes = 7
+model.classifier[-1] = nn.Linear(in_features=1024, out_features=num_classes)
+
+# Définir les hyperparamètres
+num_epochs = 30
+learning_rate = 0.0001
+loss_fn = nn.CrossEntropyLoss()
+
+model_trained, train_losses = train_classifier(
+    model=model,
+    train_dataloader=train_dataloader,
+    batch_size=batch_size,
+    num_epochs=num_epochs,
+    loss_fn=loss_fn,
+    optimizer_class=torch.optim.Adam,
+    learning_rate=learning_rate,
+    device=device,
+    transform_fn=None,
+    verbose=True,
+)
+
+torch.save(model_trained.state_dict(), "training/vgg-11_trained.pt")
+
+model_test = copy.deepcopy(model)
+model_test.load_state_dict(torch.load("training/vgg-11_trained.pt"))
+
+# - Apply the evaluation function using the test dataloader
+test_accuracy = eval_classifier(
+    model=model_test, eval_dataloader=test_dataloader, device=device
+)
+
+# - Print the test accuracy
+print("Test accuracy: {:.2f}%".format(test_accuracy))
+
+# # - Plot the training loss over epochs
+# plt.figure()
+# plt.plot(train_losses)
+# plt.title("Training loss over epochs")
+# plt.xlabel("Epoch")
+# plt.ylabel("Loss")
+# plt.grid()
+# plt.show()
