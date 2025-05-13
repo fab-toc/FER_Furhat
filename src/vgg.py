@@ -52,17 +52,17 @@ print("Number of test samples:", len(test_data))
 for idx, emotion in enumerate(train_data.classes):
     print(f"Label {idx} → {emotion}")
 
-batch_size = 64
+batch_size = 512
 
 train_dataloader = DataLoader(
     train_data,
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=12,
+    num_workers=16,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=6,
+    prefetch_factor=8,
 )
 
 test_dataloader = DataLoader(
@@ -70,10 +70,10 @@ test_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=12,
+    num_workers=16,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=6,
+    prefetch_factor=8,
 )
 
 # - print the number of batches in the training subset
@@ -107,8 +107,8 @@ num_classes = 7
 model.classifier[-1] = nn.Linear(in_features=4096, out_features=num_classes)
 
 # Définir les hyperparamètres
-num_epochs = 30
-learning_rate = 0.0001
+num_epochs = 40
+learning_rate = 0.0008
 loss_fn = nn.CrossEntropyLoss()
 
 model_trained, train_losses = train_classifier(
