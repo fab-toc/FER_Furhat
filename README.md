@@ -66,7 +66,6 @@ uv sync --extra rocm
 
 ```
 uv sync --extra xpu
-
 ```
 
 ### Si vous n'avez pas de carte graphique
