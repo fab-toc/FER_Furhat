@@ -4,15 +4,104 @@ version = "0.1.0"
 description = "Facial expression recognition using deep learning"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "kagglehub>=0.3.12",
-    "matplotlib>=3.10.3",
-    "torch>=2.7.0",
-    "torchvision>=0.22.0",
-]
+dependencies = ["kagglehub>=0.3.12", "matplotlib>=3.10.3"]
 
 [dependency-groups]
-dev = [
-    "ipykernel>=6.29.5",
-    "ipywidgets>=8.1.7",
+dev = ["ipykernel>=6.29.5"]
+
+
+[project.optional-dependencies]
+cpu = ["torch>=2.7.0", "torchvision>=0.22.0"] # good
+cu118 = ["torch>=2.7.0", "torchvision>=0.22.0"] # good
+cu124 = ["torch>=2.6.0", "torchvision>=0.21.0"] # good
+cu126 = ["torch>=2.7.0", "torchvision>=0.22.0"] # good
+cu128 = ["torch>=2.7.0", "torchvision>=0.22.0"] # good
+xpu = [
+    "torch>=2.7.0 ; sys_platform == 'linux' or sys_platform == 'win32'",
+    "torchvision>=0.22.0 ; sys_platform == 'linux' or sys_platform == 'win32'",
+    "pytorch-triton-xpu>=3.3.0 ; sys_platform == 'linux' or sys_platform == 'win32'",
+] # good
+rocm = [
+    "torch>=2.7.0 ; sys_platform == 'linux'",
+    "torchvision>=0.22.0 ; sys_platform == 'linux'",
+    "pytorch-triton-rocm>=3.3.0 ; sys_platform == 'linux'",
+] # good
+
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "cpu" },
+        { extra = "cu118" },
+        { extra = "cu124" },
+        { extra = "cu126" },
+        { extra = "cu128" },
+        { extra = "xpu" },
+        { extra = "rocm" },
+    ],
 ]
+
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu118", extra = "cu118", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-cu124", extra = "cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-cu126", extra = "cu126", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-cu128", extra = "cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-xpu", extra = "xpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu118", extra = "cu118" },
+    { index = "pytorch-cu124", extra = "cu124" },
+    { index = "pytorch-cu126", extra = "cu126" },
+    { index = "pytorch-cu128", extra = "cu128" },
+    { index = "pytorch-xpu", extra = "xpu" },
+    { index = "pytorch-rocm", extra = "rocm" },
+]
+pytorch-triton-xpu = [
+    { index = "pytorch-xpu", extra = "xpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+pytorch-triton-rocm = [
+    { index = "pytorch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
+]
+
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+# For Intel GPUs
+[[tool.uv.index]]
+name = "pytorch-xpu"
+url = "https://download.pytorch.org/whl/xpu"
+explicit = true
+
+# For AMD GPUs
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.3"
+explicit = true

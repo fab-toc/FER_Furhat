@@ -45,9 +45,6 @@ def train_classifier(
             # If a transform function is provided, apply it to the images
             if transform_fn is not None:
                 images = transform_fn(images)
-            # TO DO: write the training procedure for each batch. This should consist of:
-            # - vectorizing the images (size should be (batch_size, input_size))
-            images = images.view(batch_size, -1)
 
             # - calculate the predicted labels from the images using 'model_tr'
             labels_pred = model_tr(images)

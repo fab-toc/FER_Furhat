@@ -1,45 +1,76 @@
 # TPE ISSD
 
-## Description du projet
+# Description du projet
 
 Ce projet vise à implémenter un algorithme de reconnaissance de certaines expressions faciales acquises avec la caméra du robot humanoïde Furhat (https://www.furhatrobotics.com/) et à à oraliser les réponses et/ou réagir avec le robot (feedback). Ces expressions sont à choisir entre les expressions que le robot peut exprimer (surprise, sourire par exemple).
 
-## Installation
+# Installation
 
-### Installer uv
+## Installer uv
 
-#### Pour macOS and Linux :
+### Pour macOS and Linux :
 
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-#### Pour Windows :
+### Pour Windows :
 
 ```
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### Installer les dépendances du projet
+## Installer les dépendances en fonction de sa carte graphique
+
+### Pour une carte graphique NVIDIA
+
+#### Identifier la version de CUDA
+
+Pour savoir quelle version de CUDA vous avez, exécutez la commande suivante...
+
+#### Pour CUDA 11.8
 
 ```
-uv sync
+uv sync --extra cu118
 ```
 
-<!-- #### Si vous avez une carte graphique NVIDIA
+#### Pour CUDA 12.4
+
+```
+uv sync --extra cu124
+```
+
+#### Pour CUDA 12.6
+
+```
+uv sync --extra cu126
+```
+
+#### Pour CUDA 12.8
 
 ```
 uv sync --extra cu128
 ```
 
-#### Si vous avez une carte graphique Intel
+### Si vous avez une carte graphique AMD
+
+(uniquement compatible sous Linux, limitation de PyTorch)
+
+```
+uv sync --extra rocm
+```
+
+### Si vous avez une carte graphique Intel
+
+(uniquement compatible sous Linux et Windows, limitation de PyTorch)
 
 ```
 uv sync --extra xpu
+
 ```
 
-#### Si vous n'avez pas de carte graphique
+### Si vous n'avez pas de carte graphique
 
 ```
 uv sync --extra cpu
-``` -->
+```
