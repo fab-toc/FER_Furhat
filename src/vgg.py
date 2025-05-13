@@ -1,7 +1,8 @@
 import copy
 
 import kagglehub
-import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torchvision
@@ -11,8 +12,10 @@ from classifier import eval_classifier, train_classifier
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.allow_tf32 = True
+
 
 # Download FER-2013 latest version
 data_dir = kagglehub.dataset_download("msambare/fer2013")
@@ -45,18 +48,17 @@ print("Number of test samples:", len(test_data))
 for idx, emotion in enumerate(train_data.classes):
     print(f"Label {idx} → {emotion}")
 
-
-batch_size = 512
+batch_size = 1024
 
 train_dataloader = DataLoader(
     train_data,
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=8,
+    num_workers=16,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=4,
+    prefetch_factor=8,
 )
 
 test_dataloader = DataLoader(
@@ -64,10 +66,10 @@ test_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=8,
+    num_workers=16,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=4,
+    prefetch_factor=8,
 )
 
 # - print the number of batches in the training subset
@@ -84,20 +86,34 @@ model = torchvision.models.vgg19(
     weights=weights
 )  # charges les poids ImageNet pré-entraînés
 
-# # Geler toutes les couches
-# for param in model.parameters():
-#     param.requires_grad = (
-#         False  # figure l’intégralité des poids pour ne pas les recalculer
-#     )
+# 1. Geler uniquement les premiers blocs convolutifs (features[0:28])
+# VGG-19 a 5 blocs convolutifs, gardons les 2 derniers entraînables
+for param in model.features[:28].parameters():  # Blocs 1-3 gelés
+    param.requires_grad = False
+
+# Les blocs 4-5 et le classifier restent entraînables
+for param in model.features[28:].parameters():
+    param.requires_grad = True
+
+for param in model.classifier.parameters():
+    param.requires_grad = True
 
 # Remplacer la couche de sortie (le dernier module du classifier)
 num_classes = 7
 model.classifier[6] = nn.Linear(in_features=4096, out_features=num_classes)
 
 
-num_epochs = 40
+num_epochs = 30
 learning_rate = 0.001
 loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(
+    [
+        {"params": model.features[28:].parameters(), "lr": learning_rate / 10},
+        {"params": model.classifier[:-1].parameters(), "lr": learning_rate / 10},
+        {"params": model.classifier[-1].parameters(), "lr": learning_rate},
+    ],
+    fused=True,
+)
 
 model_trained, train_losses = train_classifier(
     model=model,
@@ -105,16 +121,18 @@ model_trained, train_losses = train_classifier(
     batch_size=batch_size,
     num_epochs=num_epochs,
     loss_fn=loss_fn,
+    optimizer=optimizer,
     learning_rate=learning_rate,
     device=device,
     transform_fn=None,
     verbose=True,
 )
 
-torch.save(model_trained.state_dict(), "training/vgg-11_trained.pt")
+torch.save(model_trained.state_dict(), "training/vgg-19_trained.pt")
 
 model_test = copy.deepcopy(model)
-model_test.load_state_dict(torch.load("training/vgg-11_trained.pt"))
+model_test.load_state_dict(torch.load("training/vgg-19_trained.pt"))
+model = torch.compile(model, mode="reduce-overhead")
 
 # - Apply the evaluation function using the test dataloader
 test_accuracy = eval_classifier(
