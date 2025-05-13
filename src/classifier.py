@@ -1,5 +1,5 @@
 import copy
-from typing import Callable, Optional
+from typing import Callable, Optional, Type
 
 import torch
 import torch.nn as nn
@@ -12,7 +12,7 @@ def train_classifier(
     batch_size: int,
     num_epochs: int,
     loss_fn: nn.Module,
-    optimizer: torch.optim.Optimizer,
+    optimizer_class: Type[torch.optim.Optimizer],
     learning_rate: float,
     device: torch.device,
     transform_fn: Optional[Callable] = None,
@@ -27,7 +27,7 @@ def train_classifier(
     # Set the model to training mode, this is important for models that have layers like dropout or batch normalization
     model_tr.train()
 
-    optimizer = optimizer(model_tr.features(), lr=learning_rate)
+    optimizer = optimizer_class(model_tr.parameters(), **{"lr": learning_rate})  # type: ignore
 
     # Initialize a list for storing the training loss over epochs
     train_losses = []

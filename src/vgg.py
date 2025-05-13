@@ -1,13 +1,12 @@
 import copy
 
 import kagglehub
-
-# import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader
 
+# import matplotlib.pyplot as plt
 from classifier import eval_classifier, train_classifier
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -91,61 +90,58 @@ model = torchvision.models.vgg11(
     weights=weights
 )  # charges les poids ImageNet pré-entraînés
 
-for i, layer in enumerate(model.features):
-    print(i, layer)
 
-# # 1. Geler uniquement les premiers blocs convolutifs (features[0:28])
-# # VGG-11 a 5 blocs convolutifs, gardons les 2 derniers entraînables
-# for param in model.features[:28].parameters():  # Blocs 1-3 gelés
-#     param.requires_grad = False
+# 1. Geler uniquement les premiers blocs convolutifs (features)
+for param in model.features.parameters():
+    param.requires_grad = False
 
 # # Les blocs 4-5 et le classifier restent entraînables
-# for param in model.features[28:].parameters():
+# for param in model.features.parameters():
 #     param.requires_grad = True
 
-# for param in model.classifier.parameters():
-#     param.requires_grad = True
+for param in model.classifier.parameters():
+    param.requires_grad = True
 
-# # Remplacer la couche de sortie (le dernier module du classifier)
-# num_classes = 7
-# model.classifier[6] = nn.Linear(in_features=4096, out_features=num_classes)
+# Remplacer la couche de sortie (le dernier module du classifier)
+num_classes = 7
+model.classifier[-1] = nn.Linear(in_features=4096, out_features=num_classes)
 
+# Définir les hyperparamètres
+num_epochs = 30
+learning_rate = 0.0001
+loss_fn = nn.CrossEntropyLoss()
 
-# num_epochs = 30
-# learning_rate = 0.0001
-# loss_fn = nn.CrossEntropyLoss()
-# optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+model_trained, train_losses = train_classifier(
+    model=model,
+    train_dataloader=train_dataloader,
+    batch_size=batch_size,
+    num_epochs=num_epochs,
+    loss_fn=loss_fn,
+    optimizer_class=torch.optim.Adam,
+    learning_rate=learning_rate,
+    device=device,
+    transform_fn=None,
+    verbose=True,
+)
 
-# model_trained, train_losses = train_classifier(
-#     model=model,
-#     train_dataloader=train_dataloader,
-#     batch_size=batch_size,
-#     num_epochs=num_epochs,
-#     loss_fn=loss_fn,
-#     optimizer=optimizer,
-#     device=device,
-#     transform_fn=None,
-#     verbose=True,
-# )
+torch.save(model_trained.state_dict(), "training/vgg-11_trained.pt")
 
-# torch.save(model_trained.state_dict(), "training/vgg-11_trained.pt")
+model_test = copy.deepcopy(model)
+model_test.load_state_dict(torch.load("training/vgg-11_trained.pt"))
 
-# model_test = copy.deepcopy(model)
-# model_test.load_state_dict(torch.load("training/vgg-11_trained.pt"))
+# - Apply the evaluation function using the test dataloader
+test_accuracy = eval_classifier(
+    model=model_test, eval_dataloader=test_dataloader, device=device
+)
 
-# # - Apply the evaluation function using the test dataloader
-# test_accuracy = eval_classifier(
-#     model=model_test, eval_dataloader=test_dataloader, device=device
-# )
+# - Print the test accuracy
+print("Test accuracy: {:.2f}%".format(test_accuracy))
 
-# # - Print the test accuracy
-# print("Test accuracy: {:.2f}%".format(test_accuracy))
-
-# # # - Plot the training loss over epochs
-# # plt.figure()
-# # plt.plot(train_losses)
-# # plt.title("Training loss over epochs")
-# # plt.xlabel("Epoch")
-# # plt.ylabel("Loss")
-# # plt.grid()
-# # plt.show()
+# # - Plot the training loss over epochs
+# plt.figure()
+# plt.plot(train_losses)
+# plt.title("Training loss over epochs")
+# plt.xlabel("Epoch")
+# plt.ylabel("Loss")
+# plt.grid()
+# plt.show()
