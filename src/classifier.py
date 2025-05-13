@@ -1,9 +1,10 @@
 import copy
 from typing import Callable, Optional
-from torch.amp import GradScaler, autocast
 
 import torch
 import torch.nn as nn
+from torch.amp.autocast_mode import autocast
+from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader
 
 
@@ -31,7 +32,7 @@ def train_classifier(
     model_tr.train()
 
     # Initialize the optimizer
-    optimizer = torch.optim.Adam(model_tr.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model_tr.parameters(), lr=learning_rate, fused=True)
 
     # Initialize a list for storing the training loss over epochs
     train_losses = []
@@ -43,8 +44,8 @@ def train_classifier(
 
         # Iterate over batches using the dataloader
         for images, labels in train_dataloader:
-            images = images.to(device)
-            labels = labels.to(device)
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
 
             # If a transform function is provided, apply it to the images
             if transform_fn is not None:
@@ -58,7 +59,7 @@ def train_classifier(
                 loss = loss_fn(labels_pred, labels)
 
             # - set the optimizer gradients at 0 for safety
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
             # - compute the gradients (use the 'backward' method on 'loss')
             scaler.scale(loss).backward()
@@ -69,7 +70,8 @@ def train_classifier(
 
             # Update the current epoch loss
             # Note that 'loss.item()' is the loss averaged over the batch, so multiply it with the current batch size to get the total batch loss
-            tr_loss += loss.item() * batch_size
+            with torch.no_grad():
+                tr_loss += loss.item() * batch_size
 
         # At the end of each epoch, get the average training loss and store it
         tr_loss = tr_loss / (len(train_dataloader) * batch_size)
@@ -103,8 +105,8 @@ def eval_classifier(
 
         # Iterate over the dataset using the dataloader
         for images, labels in eval_dataloader:
-            images = images.to(device)
-            labels = labels.to(device)
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
 
             # If a transform function is provided, apply it to the images
             if transform_fn is not None:

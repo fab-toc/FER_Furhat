@@ -1,14 +1,17 @@
-from classifier import train_classifier, eval_classifier
+import copy
 
+import kagglehub
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
-import copy
-import kagglehub
+
+from classifier import eval_classifier, train_classifier
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
 # Download FER-2013 latest version
 data_dir = kagglehub.dataset_download("msambare/fer2013")
@@ -41,14 +44,28 @@ for idx, emotion in enumerate(train_data.classes):
     print(f"Label {idx} → {emotion}")
 
 
-batch_size = 2048
+batch_size = 4096
 
 train_dataloader = DataLoader(
-    train_data, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=8, pin_memory=True
+    train_data,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+    num_workers=24,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=3,
 )
 
 test_dataloader = DataLoader(
-    test_data, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=8, pin_memory=True
+    test_data,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+    num_workers=24,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=3,
 )
 
 # - print the number of batches in the training subset
@@ -58,7 +75,6 @@ print("Number of batches in the training subset:", num_batches)
 # - print the number of batches in the testing subset
 num_batches = len(test_dataloader)
 print("Number of batches in the testing subset:", num_batches)
-
 
 
 # 3. Calcul de mean & std
@@ -115,11 +131,25 @@ for idx, emotion in enumerate(train_data.classes):
 batch_size = 768
 
 train_dataloader = DataLoader(
-    train_data, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=8, pin_memory=True
+    train_data,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+    num_workers=24,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=3,
 )
 
 test_dataloader = DataLoader(
-    test_data, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=8, pin_memory=True
+    test_data,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+    num_workers=24,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=3,
 )
 
 # - print the number of batches in the training subset
@@ -151,6 +181,9 @@ model.classifier[6] = nn.Linear(in_features=4096, out_features=num_classes)
 for param in model.classifier[6].parameters():
     param.requires_grad = True
 
+
+torch.backends.cudnn.benchmark = True
+# model = torch.compile(model, mode="max-autotune")
 
 num_epochs = 15
 learning_rate = 0.0001
