@@ -73,3 +73,7 @@ uv sync --extra xpu
 ```
 uv sync --extra cpu
 ```
+
+## Créer ses variables d'environnement
+
+Créer un fichier `.env` à la racine du projet et y ajouter les variables d'environnement mentionnées dans `.env.example`, en remplaçant les valeurs par celles de votre configuration.
