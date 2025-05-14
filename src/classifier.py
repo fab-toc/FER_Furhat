@@ -85,6 +85,7 @@ def eval_classifier(
     model: nn.Module,
     eval_dataloader: DataLoader,
     device: torch.device,
+    loss_fn: Optional[nn.Module] = None,
     transform_fn: Optional[Callable] = None,
 ):
     # Set the model in 'evaluation' mode (this disables some layers (batch norm, dropout...) which are not needed when testing)
@@ -92,11 +93,13 @@ def eval_classifier(
 
     model.to(device, non_blocking=True)
 
+    # initialize the total and correct number of labels to compute the accuracy
+    correct_labels = 0
+    total_labels = 0
+    total_loss = 0  # Pour accumuler la perte totale
+
     # In evaluation phase, we don't need to compute gradients (for memory efficiency)
     with torch.no_grad():
-        # initialize the total and correct number of labels to compute the accuracy
-        correct_labels = 0
-        total_labels = 0
 
         # Iterate over the dataset using the dataloader
         for images, labels in eval_dataloader:
@@ -110,6 +113,11 @@ def eval_classifier(
             # Get the predicted labels
             y_predicted = model(images)
 
+            # Calculer la perte si une fonction de perte est fournie
+            if loss_fn is not None:
+                loss = loss_fn(y_predicted, labels)
+                total_loss += loss.item() * labels.size(0)  # Multiplier par la taille du batch
+
             # To get the predicted labels, we need to get the max over all possible classes
             _, labels_predicted = torch.max(y_predicted.data, 1)
 
@@ -118,5 +126,6 @@ def eval_classifier(
             correct_labels += (labels_predicted == labels).sum().item()
 
     accuracy = 100 * correct_labels / total_labels
+    avg_loss = total_loss / total_labels if loss_fn is not None else None
 
-    return accuracy
+    return accuracy, avg_loss

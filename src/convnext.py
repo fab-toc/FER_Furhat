@@ -5,9 +5,11 @@ import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader
-
-# import matplotlib.pyplot as plt
 from classifier import eval_classifier, train_classifier
+import matplotlib.pyplot as plt
+import matplotlib
+
+matplotlib.use('Agg')  # Use a non-interactive backend
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -53,7 +55,7 @@ print("Number of test samples:", len(test_data))
 for idx, emotion in enumerate(train_data.classes):
     print(f"Label {idx} → {emotion}")
 
-batch_size = 64
+batch_size = 256
 
 train_dataloader = DataLoader(
     train_data,
@@ -86,8 +88,8 @@ num_batches = len(test_dataloader)
 print("Number of batches in the testing subset:", num_batches)
 
 
-weights = torchvision.models.ConvNeXt_Base_Weights.IMAGENET1K_V1
-model = torchvision.models.convnext_base(
+weights = torchvision.models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1
+model = torchvision.models.convnext_tiny(
     weights=weights
 )  # charges les poids ImageNet pré-entraînés
 
@@ -96,43 +98,52 @@ model = torchvision.models.convnext_base(
 for param in model.features.parameters():
     param.requires_grad = False
 
+for param in model.features[3:].parameters():
+    param.requires_grad = True
+
 for param in model.classifier.parameters():
     param.requires_grad = True
 
+print(model.classifier)
 # Remplacer la couche de sortie (le dernier module du classifier)
 num_classes = 7
-model.classifier[-1] = nn.Linear(in_features=1024, out_features=num_classes)
+model.classifier[-1] = nn.Linear(in_features=768, out_features=num_classes)
 
 # Définir les hyperparamètres
 num_epochs = 30
-learning_rate = 0.0001
+learning_rate = 0.0005
 loss_fn = nn.CrossEntropyLoss()
 
-model_trained, train_losses = train_classifier(
-    model=model,
-    train_dataloader=train_dataloader,
-    batch_size=batch_size,
-    num_epochs=num_epochs,
-    loss_fn=loss_fn,
-    optimizer_class=torch.optim.Adam,
-    learning_rate=learning_rate,
-    device=device,
-    transform_fn=None,
-    verbose=True,
-)
+# model_trained, train_losses = train_classifier(
+#     model=model,
+#     train_dataloader=train_dataloader,
+#     batch_size=batch_size,
+#     num_epochs=num_epochs,
+#     loss_fn=loss_fn,
+#     optimizer_class=torch.optim.Adam,
+#     learning_rate=learning_rate,
+#     device=device,
+#     transform_fn=None,
+#     verbose=True,
+# )
 
-torch.save(model_trained.state_dict(), "training/vgg-11_trained.pt")
+# torch.save(model_trained.state_dict(), "training/convnext_tiny_30.pt")
 
 model_test = copy.deepcopy(model)
-model_test.load_state_dict(torch.load("training/vgg-11_trained.pt"))
+model_test.load_state_dict(torch.load("training/convnext_tiny_30.pt"))
 
 # - Apply the evaluation function using the test dataloader
-test_accuracy = eval_classifier(
-    model=model_test, eval_dataloader=test_dataloader, device=device
+test_accuracy, avg_loss = eval_classifier(
+    model=model_test, eval_dataloader=test_dataloader, device=device, loss_fn=loss_fn
 )
+
+print("====TEST RESULTS====")
 
 # - Print the test accuracy
 print("Test accuracy: {:.2f}%".format(test_accuracy))
+
+# - Print the average loss
+print("Average loss: {:.4f}".format(avg_loss))
 
 # # - Plot the training loss over epochs
 # plt.figure()
