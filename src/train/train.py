@@ -1,6 +1,7 @@
 import copy
 import os
 import shutil
+from typing import Literal
 
 import kagglehub
 import torch
@@ -11,36 +12,71 @@ from utils import (
     eval_classifier,
     get_data_transforms,
     get_model,
+    parse_args,
     save_model,
+    setup_pytorch_optimal,
     train_classifier_with_validation,
 )
+
+# Set up the script
+args = parse_args()
 
 # Set the random seed for reproducibility
 torch.manual_seed(0)
 
-# Some PyTorch settings to work well with CUDA
+# Automatic configuration of PyTorch settings
+hw_info, optimal_params = setup_pytorch_optimal(verbose=True)
+
+# Use the optimal parameters
+num_workers = (
+    args.num_workers if args.num_workers is not None else optimal_params["num_workers"]
+)
+prefetch_factor = (
+    args.prefetch_factor
+    if args.prefetch_factor is not None
+    else optimal_params["prefetch_factor"]
+)
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.benchmark = True
-torch.backends.cudnn.allow_tf32 = True
 
 
 ######################## HYPER PARAMETERS ########################
 emotions_to_exclude = ["surprise", "neutral", "disgust"]
 
-model_name: str = "vgg"
-model_version: str = "11"
+augmentation_level = args.augmentation  # Options: "none", "light", "medium", "heavy"
 
-batch_size: int = 256
-num_epochs: int = 20
-learning_rate: float = 0.0001
+model_name: Literal["vgg", "convnext"] = args.model_name  # Options: "vgg", "convnext"
+model_version: Literal["11", "13", "16", "19", "tiny", "small", "base", "large"] = (
+    args.model_version
+)  # Options: "11", "13", "16", "19", "tiny", "small", "base", "large"
+
+
+batch_size = (
+    args.batch_size if args.batch_size is not None else optimal_params["batch_size"]
+)
+# batch_size: int = 256
+num_epochs: int = args.epochs
+learning_rate: float = args.lr
 loss_fn: nn.Module = nn.CrossEntropyLoss()
 
 unfreeze_feature_layer_start: int = (
-    6  # Unfreeze the feature layers starting from this one
-)
+    args.unfreeze_layer
+)  # Unfreeze the feature layers starting from this one
 
-# DO NOT FORGET TO CHANGE THE MODEL USED DOWN THERE, IN THE MODEL SECTION
+# Print all hyperparameters for verification
+print("\n======== HYPERPARAMETERS ========")
+print(f"Model name: {model_name}")
+print(f"Model version: {model_version}")
+print(f"Batch size: {batch_size}")
+print(f"Number of epochs: {num_epochs}")
+print(f"Learning rate: {learning_rate}")
+print(f"Augmentation level: {augmentation_level}")
+print(f"Emotions to exclude: {emotions_to_exclude}")
+print(f"Unfreeze feature layers starting from: {unfreeze_feature_layer_start}")
+print(f"Number of workers: {num_workers}")
+print(f"Prefetch factor: {prefetch_factor}")
+print(f"Device: {device}")
+print("================================\n")
 
 
 ######################## DATASET ########################
@@ -99,10 +135,10 @@ train_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=12,
+    num_workers=num_workers,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=10,
+    prefetch_factor=prefetch_factor,
 )
 
 valid_dataloader = DataLoader(
@@ -110,10 +146,10 @@ valid_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=12,
+    num_workers=num_workers,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=10,
+    prefetch_factor=prefetch_factor,
 )
 
 test_dataloader = DataLoader(
@@ -121,10 +157,10 @@ test_dataloader = DataLoader(
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
-    num_workers=12,
+    num_workers=num_workers,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=10,
+    prefetch_factor=prefetch_factor,
 )
 
 num_batches = len(train_dataloader)
@@ -138,8 +174,6 @@ print("Number of batches in the testing subset:", num_batches)
 
 
 ######################## MODEL ########################
-
-
 # Get the model based on the hyperparameters
 model = get_model(
     model_name=model_name,
