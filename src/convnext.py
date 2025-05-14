@@ -7,7 +7,7 @@ import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader, random_split
 
-from classifier import eval_classifier, train_classifier_with_validation
+from classifier import eval_classifier, train_classifier_with_validation, filter_dataset
 
 matplotlib.use("Agg")  # Use a non-interactive backend
 
@@ -49,12 +49,25 @@ test_data = torchvision.datasets.ImageFolder(
 
 CLASSES = train_data.classes
 
+# Émotions à exclure
+emotions_to_exclude = ["surprise", "neutral", "disgust"]
+
+# Identifier les indices correspondants
+indices_to_exclude = [CLASSES.index(emotion) for emotion in emotions_to_exclude]
+print("Indices des émotions à exclure :", indices_to_exclude)
+
+# Filtrer les datasets
+train_data = filter_dataset(train_data, indices_to_exclude)
+test_data = filter_dataset(test_data, indices_to_exclude)
+
+# Mettre à jour la liste des classes après filtrage
+CLASSES = [emotion for emotion in CLASSES if emotion not in emotions_to_exclude]
+print("Classes après filtrage :", CLASSES)
+
 # Define the validation set by splitting the training data into 2 subsets (80% training and 20% validation)
 n_train_examples = int(len(train_data) * 0.8)
 n_valid_examples = len(train_data) - n_train_examples
 train_data, valid_data = random_split(train_data, [n_train_examples, n_valid_examples])
-
-print(len(train_data), len(valid_data))
 
 
 print("Classes of the dataset:", CLASSES)
@@ -65,7 +78,7 @@ print("Number of test samples:", len(test_data))
 for idx, emotion in enumerate(CLASSES):
     print(f"Label {idx} → {emotion}")
 
-batch_size = 256
+batch_size = 64
 
 train_dataloader = DataLoader(
     train_data,
@@ -75,7 +88,7 @@ train_dataloader = DataLoader(
     num_workers=12,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=6,
+    prefetch_factor=10,
 )
 
 test_dataloader = DataLoader(
@@ -86,7 +99,7 @@ test_dataloader = DataLoader(
     num_workers=12,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=6,
+    prefetch_factor=10,
 )
 
 valid_dataloader = DataLoader(
@@ -97,7 +110,7 @@ valid_dataloader = DataLoader(
     num_workers=12,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=6,
+    prefetch_factor=10,
 )
 
 # - print the number of batches in the training subset
@@ -113,8 +126,8 @@ num_batches = len(valid_dataloader)
 print("Number of batches in the validation subset:", num_batches)
 
 
-weights = torchvision.models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1
-model = torchvision.models.convnext_tiny(
+weights = torchvision.models.ConvNeXt_Large_Weights.IMAGENET1K_V1
+model = torchvision.models.convnext_large(
     weights=weights
 )  # charges les poids ImageNet pré-entraînés
 
@@ -123,7 +136,7 @@ model = torchvision.models.convnext_tiny(
 for param in model.features.parameters():
     param.requires_grad = False
 
-for param in model.features[3:].parameters():
+for param in model.features[2:].parameters():
     param.requires_grad = True
 
 for param in model.classifier.parameters():
@@ -132,11 +145,11 @@ for param in model.classifier.parameters():
 print(model.classifier)
 # Remplacer la couche de sortie (le dernier module du classifier)
 num_classes = 7
-model.classifier[-1] = nn.Linear(in_features=768, out_features=num_classes)
+model.classifier[-1] = nn.Linear(in_features=1536, out_features=num_classes)
 
 # Définir les hyperparamètres
-num_epochs = 30
-learning_rate = 0.0005
+num_epochs = 50
+learning_rate = 0.00005
 loss_fn = nn.CrossEntropyLoss()
 
 model_trained, train_losses, val_accuracies = train_classifier_with_validation(
@@ -153,10 +166,10 @@ model_trained, train_losses, val_accuracies = train_classifier_with_validation(
     verbose=True,
 )
 
-torch.save(model_trained.state_dict(), "training/convnext_tiny_30.pt")
+torch.save(model_trained.state_dict(), "training/convnext_large_234_50.pt")
 
 model_test = copy.deepcopy(model)
-model_test.load_state_dict(torch.load("training/convnext_tiny_30.pt"))
+model_test.load_state_dict(torch.load("training/convnext_large_234_50.pt"))
 
 # - Apply the evaluation function using the test dataloader
 test_accuracy, avg_loss = eval_classifier(

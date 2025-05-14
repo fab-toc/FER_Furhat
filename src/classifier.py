@@ -3,7 +3,25 @@ from typing import Callable, Optional, Type
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
+def filter_dataset(dataset, indices_to_exclude):
+    # Déterminer les labels valides et leur mapping vers de nouveaux indices
+    valid_labels = sorted(set(range(len(dataset.classes))) - set(indices_to_exclude))
+    mapping = {old_label: new_label for new_label, old_label in enumerate(valid_labels)}
+    
+    # Filtrer les samples et mettre à jour les labels
+    new_samples = [(path, mapping[label])
+                   for path, label in dataset.samples
+                   if label not in indices_to_exclude]
+    
+    # Mettre à jour le dataset directement
+    dataset.samples = new_samples
+    dataset.targets = [label for _, label in new_samples]
+    dataset.classes = [dataset.classes[i] for i in valid_labels]
+    
+    return dataset
 
 
 def train_classifier_with_validation(
@@ -27,6 +45,8 @@ def train_classifier_with_validation(
     model_tr.train()
 
     optimizer = optimizer_class(model_tr.parameters(), **{"lr": learning_rate})  # type: ignore
+
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2)
 
     # Initialize a list for storing the training loss over epochs
     train_losses = []
@@ -95,10 +115,19 @@ def train_classifier_with_validation(
             model_opt.to(device, non_blocking=True)
         if verbose:
             print(
-                "Validation accuracy: {:.2f}%\n Average loss: {:.4f}\n".format(
+                "Validation accuracy: {:.2f}%\nValidation loss: {:.4f}".format(
                     accuracy, avg_loss
                 )
             )
+        
+        # Step the scheduler with the validation loss
+        scheduler.step(avg_loss)
+
+        # Display the current learning rate
+        current_lr = optimizer.param_groups[0]['lr']
+        if verbose:
+            print(f"LR after epoch {epoch + 1}: {current_lr:.3e}\n")
+        
 
     return model_opt, train_losses, val_accuracies
 
