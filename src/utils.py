@@ -1,27 +1,83 @@
 import copy
-from typing import Callable, Optional, Type
+from typing import Callable, Literal, Optional, Tuple, Type
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Subset
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader
+from torchvision import transforms
 
-def filter_dataset(dataset, indices_to_exclude):
-    # Déterminer les labels valides et leur mapping vers de nouveaux indices
-    valid_labels = sorted(set(range(len(dataset.classes))) - set(indices_to_exclude))
-    mapping = {old_label: new_label for new_label, old_label in enumerate(valid_labels)}
-    
-    # Filtrer les samples et mettre à jour les labels
-    new_samples = [(path, mapping[label])
-                   for path, label in dataset.samples
-                   if label not in indices_to_exclude]
-    
-    # Mettre à jour le dataset directement
-    dataset.samples = new_samples
-    dataset.targets = [label for _, label in new_samples]
-    dataset.classes = [dataset.classes[i] for i in valid_labels]
-    
-    return dataset
+
+def get_data_transforms(
+    input_format: Literal["grayscale", "rgb", "rgba"],
+    target_channels: int,
+    target_size: Tuple[int, int],
+    augmentation_level: Optional[
+        Literal["none", "light", "medium", "heavy", None]
+    ] = "medium",
+    custom_means: Optional[list[float]] = [
+        0.485,
+        0.456,
+        0.406,
+    ],  # Default to ImageNet stats if not specified
+    custom_stds: Optional[list[float]] = [
+        0.229,
+        0.224,
+        0.225,
+    ],  # Default to ImageNet stats if not specified
+) -> transforms.Compose:
+    transform_list = []
+
+    # Handle color mode conversion
+    if input_format == "grayscale":
+        transform_list.append(transforms.Grayscale(num_output_channels=target_channels))
+
+    # Handle other color conversions
+    if input_format == "rgb":
+        if target_channels == 1:
+            transform_list.append(transforms.Grayscale(num_output_channels=1))
+        elif target_channels == 4:
+            # Add alpha channel (convert RGB to RGBA)
+            # This would typically be handled in a custom transform
+            pass  # Custom handling would go here
+    elif input_format == "rgba":
+        if target_channels == 1:
+            transform_list.append(transforms.Grayscale(num_output_channels=1))
+        elif target_channels == 3:
+            # Drop alpha channel (convert RGBA to RGB)
+            # This would typically be handled in a custom transform
+            pass  # Custom handling would go here
+
+    # Apply augmentation based on level
+    if augmentation_level != "none":
+        if augmentation_level in ["medium", "heavy"]:
+            transform_list.append(transforms.RandomHorizontalFlip())
+            transform_list.append(transforms.RandomVerticalFlip())
+            transform_list.append(transforms.RandomRotation(10))
+            transform_list.append(transforms.RandomAffine(0, translate=(0.1, 0.1)))
+            transform_list.append(transforms.ColorJitter(brightness=0.2, contrast=0.2))
+
+        if augmentation_level == "light":
+            transform_list.append(transforms.RandomHorizontalFlip())
+            transform_list.append(transforms.RandomRotation(5))
+
+        if augmentation_level == "heavy":
+            # Add more intense augmentations
+            transform_list.append(
+                transforms.RandomPerspective(distortion_scale=0.2, p=0.5)
+            )
+            transform_list.append(transforms.RandomErasing(p=0.2))
+
+    # Always resize to target size
+    transform_list.append(transforms.Resize(target_size))
+
+    # Convert to tensor
+    transform_list.append(transforms.ToTensor())
+
+    # Normalize using custom means and stds
+    transform_list.append(transforms.Normalize(mean=custom_means, std=custom_stds))
+
+    return transforms.Compose(transform_list)
 
 
 def train_classifier_with_validation(
@@ -46,7 +102,7 @@ def train_classifier_with_validation(
 
     optimizer = optimizer_class(model_tr.parameters(), **{"lr": learning_rate})  # type: ignore
 
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2)
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=2)
 
     # Initialize a list for storing the training loss over epochs
     train_losses = []
@@ -119,15 +175,14 @@ def train_classifier_with_validation(
                     accuracy, avg_loss
                 )
             )
-        
+
         # Step the scheduler with the validation loss
         scheduler.step(avg_loss)
 
         # Display the current learning rate
-        current_lr = optimizer.param_groups[0]['lr']
+        current_lr = optimizer.param_groups[0]["lr"]
         if verbose:
             print(f"LR after epoch {epoch + 1}: {current_lr:.3e}\n")
-        
 
     return model_opt, train_losses, val_accuracies
 

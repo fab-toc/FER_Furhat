@@ -1,100 +1,95 @@
 import copy
+import os
+import shutil
 
 import kagglehub
-import matplotlib
 import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader, random_split
 
-from classifier import eval_classifier, train_classifier_with_validation, filter_dataset
+from utils import (
+    eval_classifier,
+    get_data_transforms,
+    train_classifier_with_validation,
+)
 
+# Set the random seed for reproducibility
+torch.manual_seed(0)
+
+# Some PyTorch settings to work well with CUDA
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.allow_tf32 = True
 
 
-# Download FER-2013 latest version
-data_dir = kagglehub.dataset_download("msambare/fer2013")
+######## HYPER PARAMETERS ########
+emotions_to_exclude = ["surprise", "neutral", "disgust"]
 
-data_transforms = torchvision.transforms.Compose(
-    [
-        torchvision.transforms.Grayscale(
-            num_output_channels=3
-        ),  # si modèles pré-entraînés ImageNet
-        torchvision.transforms.RandomHorizontalFlip(),  # Retournement aléatoire
-        torchvision.transforms.RandomRotation(10),  # Rotation légère
-        torchvision.transforms.RandomAffine(0, translate=(0.1, 0.1)),  # Translation
-        torchvision.transforms.Resize((224, 224)),  # ou autre résolution
-        torchvision.transforms.ColorJitter(brightness=0.2, contrast=0.2),
-        torchvision.transforms.ToTensor(),
-        # Utiliser les statistiques d'ImageNet
-        torchvision.transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        ),
-    ]
+batch_size: int = 256
+num_epochs: int = 20
+learning_rate: float = 0.0001
+loss_fn: nn.Module = nn.CrossEntropyLoss()
+
+unfreeze_layer_start: int = (
+    6  # Unfreeze the convolutional layers starting from this one
 )
 
-# Load the FER-2013 dataset
+
+######## DATASET ########
+data_dir = kagglehub.dataset_download("msambare/fer2013")
+
+data_transforms = get_data_transforms(
+    input_format="grayscale",
+    target_channels=3,  # Target channels for the model
+    target_size=(224, 224),  # Target size of each image for the model used
+    augmentation_level="heavy",
+    custom_means=[0.485, 0.456, 0.406],  # ImageNet stats by default
+    custom_stds=[0.229, 0.224, 0.225],  # ImageNet stats by default
+)
+
+# Remove the directories of the excluded emotions
+for split in ["train", "test"]:
+    split_dir = os.path.join(data_dir, split)
+    for emotion in emotions_to_exclude:
+        emotion_dir = os.path.join(split_dir, emotion)
+        if os.path.exists(emotion_dir):
+            print(f"Removing directory {emotion_dir}")
+            shutil.rmtree(emotion_dir)
+
+# Load the dataset
 train_data = torchvision.datasets.ImageFolder(
-    data_dir + "/train", transform=data_transforms
+    os.path.join(data_dir, "train"),
+    transform=data_transforms,
 )
 
 test_data = torchvision.datasets.ImageFolder(
-    data_dir + "/test", transform=data_transforms
+    os.path.join(data_dir, "test"),
+    transform=data_transforms,
 )
 
 CLASSES = train_data.classes
+print("Classes of the dataset:", CLASSES)
 
-# Émotions à exclure
-emotions_to_exclude = ["surprise", "neutral", "disgust"]
-
-# Identifier les indices correspondants
-indices_to_exclude = [CLASSES.index(emotion) for emotion in emotions_to_exclude]
-print("Indices des émotions à exclure :", indices_to_exclude)
-
-# Filtrer les datasets
-train_data = filter_dataset(train_data, indices_to_exclude)
-test_data = filter_dataset(test_data, indices_to_exclude)
-
-# Mettre à jour la liste des classes après filtrage
-CLASSES = [emotion for emotion in CLASSES if emotion not in emotions_to_exclude]
-print("Classes après filtrage :", CLASSES)
-
-# Vérifier les labels après filtrage
-print("Labels dans le dataset d'entraînement :", set([label for _, label in train_data]))
-print("Labels dans le dataset de test :", set([label for _, label in test_data]))
+# Print the mapping of labels to emotions
+print("\nMapping of labels to emotions:")
+for idx, emotion in enumerate(CLASSES):
+    print(f"Label {idx} → {emotion}")
 
 # Define the validation set by splitting the training data into 2 subsets (80% training and 20% validation)
 n_train_examples = int(len(train_data) * 0.8)
 n_valid_examples = len(train_data) - n_train_examples
 train_data, valid_data = random_split(train_data, [n_train_examples, n_valid_examples])
 
+print(f"\nNumber of train samples: {len(train_data)}")
+print(f"Number of validation samples: {len(valid_data)}")
+print(f"Number of test samples: {len(test_data)}")
 
-print("Classes of the dataset:", CLASSES)
-print("Number of training samples:", len(train_data))
-print("Number of test samples:", len(test_data))
 
-# Pour afficher le mapping complet
-for idx, emotion in enumerate(CLASSES):
-    print(f"Label {idx} → {emotion}")
-
-batch_size = 256
-
+######## DATALOADERS ########
 train_dataloader = DataLoader(
     train_data,
-    batch_size=batch_size,
-    shuffle=True,
-    drop_last=True,
-    num_workers=12,
-    pin_memory=True,
-    persistent_workers=True,
-    prefetch_factor=10,
-)
-
-test_dataloader = DataLoader(
-    test_data,
     batch_size=batch_size,
     shuffle=True,
     drop_last=True,
@@ -115,48 +110,53 @@ valid_dataloader = DataLoader(
     prefetch_factor=10,
 )
 
-# - print the number of batches in the training subset
+test_dataloader = DataLoader(
+    test_data,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+    num_workers=12,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=10,
+)
+
 num_batches = len(train_dataloader)
 print("Number of batches in the training subset:", num_batches)
 
-# - print the number of batches in the testing subset
-num_batches = len(test_dataloader)
-print("Number of batches in the testing subset:", num_batches)
-
-# - print the number of batches in the validation subset
 num_batches = len(valid_dataloader)
 print("Number of batches in the validation subset:", num_batches)
 
-
-weights = torchvision.models.VGG11_Weights.IMAGENET1K_V1
-model = torchvision.models.vgg11(
-    weights=weights
-)  # charges les poids ImageNet pré-entraînés
+num_batches = len(test_dataloader)
+print("Number of batches in the testing subset:", num_batches)
 
 
-# Geler toutes les couches du modèle
+######## MODEL ########
+# Choose the model you want to use
+weights = (
+    torchvision.models.VGG11_Weights.IMAGENET1K_V1
+)  # Initialization with ImageNet pretrained weights
+model = torchvision.models.vgg11(weights=weights)
+
+# Freeze all the convolutional layers of the model
 for param in model.features.parameters():
     param.requires_grad = False
 
-# Dégeler les couches convolutives à partir de la 11ème
-for param in model.features[6:].parameters():
+# Unfreeze the convolutional layers starting from the "x"th one
+for param in model.features[unfreeze_layer_start:].parameters():
     param.requires_grad = True
 
-# Dégeler la partie classifier du modèle
+# Unfreeze the classifier part of the model
 for param in model.classifier.parameters():
     param.requires_grad = True
 
-# Remplacer la couche de sortie (le dernier module du classifier)
-num_classes = 4
-model.classifier[-1] = nn.Linear(in_features=4096, out_features=num_classes)
+# Replace the output layer (the last layer of the classifier)
+model.classifier[-1] = nn.Linear(in_features=4096, out_features=len(CLASSES))
 print(model.features)
 print(model.classifier)
 
-# Définir les hyperparamètres
-num_epochs = 20
-learning_rate = 0.0001
-loss_fn = nn.CrossEntropyLoss()
 
+######## TRAINING ########
 model_trained, train_losses, val_accuracies = train_classifier_with_validation(
     model=model,
     train_dataloader=train_dataloader,
@@ -170,9 +170,10 @@ model_trained, train_losses, val_accuracies = train_classifier_with_validation(
     transform_fn=None,
     verbose=True,
 )
-
 torch.save(model_trained.state_dict(), "training/vgg11_b256_l6:end_e20.pt")
 
+
+######## TESTING ########
 model_test = copy.deepcopy(model)
 model_test.load_state_dict(torch.load("training/vgg11_b256_l6:end_e20.pt"))
 
@@ -182,18 +183,5 @@ test_accuracy, avg_loss = eval_classifier(
 )
 
 print("====TEST RESULTS====")
-
-# - Print the test accuracy
 print("Test accuracy: {:.2f}%".format(test_accuracy))
-
-# - Print the average loss
 print("Average loss: {:.4f}".format(avg_loss))
-
-# # - Plot the training loss over epochs
-# plt.figure()
-# plt.plot(train_losses)
-# plt.title("Training loss over epochs")
-# plt.xlabel("Epoch")
-# plt.ylabel("Loss")
-# plt.grid()
-# plt.show()
