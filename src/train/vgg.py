@@ -7,10 +7,11 @@ import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader, random_split
-
 from utils import (
     eval_classifier,
     get_data_transforms,
+    get_model,
+    save_model,
     train_classifier_with_validation,
 )
 
@@ -24,20 +25,25 @@ torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.allow_tf32 = True
 
 
-######## HYPER PARAMETERS ########
+######################## HYPER PARAMETERS ########################
 emotions_to_exclude = ["surprise", "neutral", "disgust"]
+
+model_name: str = "vgg"
+model_version: str = "11"
 
 batch_size: int = 256
 num_epochs: int = 20
 learning_rate: float = 0.0001
 loss_fn: nn.Module = nn.CrossEntropyLoss()
 
-unfreeze_layer_start: int = (
-    6  # Unfreeze the convolutional layers starting from this one
+unfreeze_feature_layer_start: int = (
+    6  # Unfreeze the feature layers starting from this one
 )
 
+# DO NOT FORGET TO CHANGE THE MODEL USED DOWN THERE, IN THE MODEL SECTION
 
-######## DATASET ########
+
+######################## DATASET ########################
 data_dir = kagglehub.dataset_download("msambare/fer2013")
 
 data_transforms = get_data_transforms(
@@ -87,7 +93,7 @@ print(f"Number of validation samples: {len(valid_data)}")
 print(f"Number of test samples: {len(test_data)}")
 
 
-######## DATALOADERS ########
+######################## DATALOADERS ########################
 train_dataloader = DataLoader(
     train_data,
     batch_size=batch_size,
@@ -131,32 +137,23 @@ num_batches = len(test_dataloader)
 print("Number of batches in the testing subset:", num_batches)
 
 
-######## MODEL ########
-# Choose the model you want to use
-weights = (
-    torchvision.models.VGG11_Weights.IMAGENET1K_V1
-)  # Initialization with ImageNet pretrained weights
-model = torchvision.models.vgg11(weights=weights)
-
-# Freeze all the convolutional layers of the model
-for param in model.features.parameters():
-    param.requires_grad = False
-
-# Unfreeze the convolutional layers starting from the "x"th one
-for param in model.features[unfreeze_layer_start:].parameters():
-    param.requires_grad = True
-
-# Unfreeze the classifier part of the model
-for param in model.classifier.parameters():
-    param.requires_grad = True
-
-# Replace the output layer (the last layer of the classifier)
-model.classifier[-1] = nn.Linear(in_features=4096, out_features=len(CLASSES))
-print(model.features)
-print(model.classifier)
+######################## MODEL ########################
 
 
-######## TRAINING ########
+# Get the model based on the hyperparameters
+model = get_model(
+    model_name=model_name,
+    model_version=model_version,
+    num_classes=len(CLASSES),
+    unfreeze_feature_layer_start=unfreeze_feature_layer_start,
+)
+
+# Print model structure to understand what we're working with
+print("\nModel structure:")
+print(model, "\n")
+
+
+######################## TRAINING ########################
 model_trained, train_losses, val_accuracies = train_classifier_with_validation(
     model=model,
     train_dataloader=train_dataloader,
@@ -170,18 +167,27 @@ model_trained, train_losses, val_accuracies = train_classifier_with_validation(
     transform_fn=None,
     verbose=True,
 )
-torch.save(model_trained.state_dict(), "training/vgg11_b256_l6:end_e20.pt")
+
+# Call the function with the trained model and parameters
+model_path = save_model(
+    model=model_trained,
+    model_name=model_name,
+    model_version=model_version,
+    batch_size=batch_size,
+    unfreeze_layer_start=unfreeze_feature_layer_start,
+    num_epochs=num_epochs,
+)
 
 
-######## TESTING ########
+######################## TESTING ########################
 model_test = copy.deepcopy(model)
-model_test.load_state_dict(torch.load("training/vgg11_b256_l6:end_e20.pt"))
+model_test.load_state_dict(torch.load(model_path))
 
 # - Apply the evaluation function using the test dataloader
 test_accuracy, avg_loss = eval_classifier(
     model=model_test, eval_dataloader=test_dataloader, device=device, loss_fn=loss_fn
 )
 
-print("====TEST RESULTS====")
+print("======== TEST RESULTS ========")
 print("Test accuracy: {:.2f}%".format(test_accuracy))
 print("Average loss: {:.4f}".format(avg_loss))

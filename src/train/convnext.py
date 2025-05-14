@@ -6,8 +6,7 @@ import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader, random_split
-
-from utils import eval_classifier, filter_dataset, train_classifier_with_validation
+from utils import eval_classifier, train_classifier_with_validation
 
 matplotlib.use("Agg")  # Use a non-interactive backend
 

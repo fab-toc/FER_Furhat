@@ -1,11 +1,149 @@
 import copy
+import os
 from typing import Callable, Literal, Optional, Tuple, Type
 
 import torch
 import torch.nn as nn
+import torchvision
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from torchvision import transforms
+
+
+def get_model(
+    num_classes: int,
+    unfreeze_feature_layer_start: int,
+    model_name: Literal["vgg", "convnext"] = "convnext",
+    model_version: Literal[
+        "11", "13", "16", "19", "tiny", "small", "base", "large"
+    ] = "tiny",
+):
+    # VGG models
+    if model_name.lower() == "vgg":
+        if model_version == "11":
+            weights = torchvision.models.VGG11_Weights.IMAGENET1K_V1
+            model = torchvision.models.vgg11(weights=weights)
+            in_features = 4096
+
+        elif model_version == "13":
+            weights = torchvision.models.VGG13_Weights.IMAGENET1K_V1
+            model = torchvision.models.vgg13(weights=weights)
+            in_features = 4096
+
+        elif model_version == "16":
+            weights = torchvision.models.VGG16_Weights.IMAGENET1K_V1
+            model = torchvision.models.vgg16(weights=weights)
+            in_features = 4096
+
+        elif model_version == "19":
+            weights = torchvision.models.VGG19_Weights.IMAGENET1K_V1
+            model = torchvision.models.vgg19(weights=weights)
+            in_features = 4096
+
+        else:
+            raise ValueError(f"Unsupported VGG version: {model_version}")
+
+    # ConvNeXt models
+    elif model_name.lower() == "convnext":
+        if model_version == "tiny":
+            weights = torchvision.models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1
+            model = torchvision.models.convnext_tiny(weights=weights)
+            in_features = 768
+
+        elif model_version == "small":
+            weights = torchvision.models.ConvNeXt_Small_Weights.IMAGENET1K_V1
+            model = torchvision.models.convnext_small(weights=weights)
+            in_features = 768
+
+        elif model_version == "base":
+            weights = torchvision.models.ConvNeXt_Base_Weights.IMAGENET1K_V1
+            model = torchvision.models.convnext_base(weights=weights)
+            in_features = 1024
+
+        elif model_version == "large":
+            weights = torchvision.models.ConvNeXt_Large_Weights.IMAGENET1K_V1
+            model = torchvision.models.convnext_large(weights=weights)
+            in_features = 1536
+
+        else:
+            raise ValueError(f"Unsupported ConvNeXt version: {model_version}")
+
+    # # ResNet models
+    # elif model_name.lower() == "resnet":
+    #     if model_version == "18":
+    #         weights = torchvision.models.ResNet18_Weights.IMAGENET1K_V1
+    #         model = torchvision.models.resnet18(weights=weights)
+    #         in_features = 512
+
+    #     elif model_version == "34":
+    #         weights = torchvision.models.ResNet34_Weights.IMAGENET1K_V1
+    #         model = torchvision.models.resnet34(weights=weights)
+    #         in_features = 512
+
+    #     elif model_version == "50":
+    #         weights = torchvision.models.ResNet50_Weights.IMAGENET1K_V1
+    #         model = torchvision.models.resnet50(weights=weights)
+    #         in_features = 2048
+
+    #     else:
+    #         raise ValueError(f"Unsupported ResNet version: {model_version}")
+
+    else:
+        raise ValueError(f"Unsupported model name: {model_name}")
+
+    # Freeze all the convolutional layers of the model
+    for param in model.features.parameters():
+        param.requires_grad = False
+
+    # Unfreeze the convolutional layers starting from the specified index
+    features = nn.Sequential(*list(model.features.children()))
+    for i in range(unfreeze_feature_layer_start, len(features)):
+        for param in features[i].parameters():
+            param.requires_grad = True
+
+    # Reassign features to the model
+    model.features = features
+
+    # Replace the output layer (the last layer of the classifier)
+    model.classifier[-1] = nn.Linear(in_features=in_features, out_features=num_classes)
+
+    # Unfreeze the classifier part of the model
+    for param in model.classifier.parameters():
+        param.requires_grad = True
+
+    return model
+
+
+def save_model(
+    model: nn.Module,
+    model_name: str,
+    model_version: str,
+    batch_size: int,
+    unfreeze_layer_start: int,
+    num_epochs: int,
+    base_dir: Optional[str] = None,
+) -> str:
+    if base_dir is None:
+        # Get the project root directory (two levels up from the current file)
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+        # Create training directory at the project root
+        base_dir = os.path.join(project_root, "training")
+
+    # Create a subdirectory with the model_name
+    model_dir = os.path.join(base_dir, model_name)
+    os.makedirs(model_dir, exist_ok=True)
+
+    # Create a dynamic filename based on model parameters
+    model_filename = f"{model_name}_{model_version}_b{batch_size}_l{unfreeze_layer_start}:end_e{num_epochs}.pt"
+    model_path = os.path.join(model_dir, model_filename)
+
+    # Save the model
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved to {model_path}")
+
+    return model_path
 
 
 def get_data_transforms(
