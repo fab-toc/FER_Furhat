@@ -65,7 +65,7 @@ def parse_args():
     parser.add_argument(
         "--augmentation",
         type=str,
-        default="heavy",
+        default="medium",
         choices=["none", "light", "medium", "heavy"],
         help="Level of data augmentation",
     )
@@ -499,21 +499,17 @@ def get_data_transforms(
             transform_list.append(transforms.RandomHorizontalFlip())
             transform_list.append(transforms.RandomRotation(5))
 
-        if augmentation_level == "heavy":
-            # Add more intense augmentations
-            transform_list.append(
-                transforms.RandomPerspective(distortion_scale=0.2, p=0.5)
-            )
-            transform_list.append(transforms.RandomErasing(p=0.2))
-
     # Always resize to target size
     transform_list.append(transforms.Resize(target_size))
 
-    if augmentation_level == "heavy":
-        transform_list.append(transforms.ColorJitter(brightness=0.2, contrast=0.2))
-
     # Convert to tensor
     transform_list.append(transforms.ToTensor())
+
+    if augmentation_level == "heavy":
+        # Add more intense augmentations
+        transform_list.append(transforms.ColorJitter(brightness=0.2, contrast=0.2))
+        transform_list.append(transforms.RandomPerspective(distortion_scale=0.2, p=0.5))
+        transform_list.append(transforms.RandomErasing(p=0.2))
 
     # Normalize using custom means and stds
     transform_list.append(transforms.Normalize(mean=custom_means, std=custom_stds))

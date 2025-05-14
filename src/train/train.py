@@ -86,7 +86,7 @@ data_transforms = get_data_transforms(
     input_format="grayscale",
     target_channels=3,  # Target channels for the model
     target_size=(224, 224),  # Target size of each image for the model used
-    augmentation_level="heavy",
+    augmentation_level=augmentation_level,
     custom_means=[0.485, 0.456, 0.406],  # ImageNet stats by default
     custom_stds=[0.229, 0.224, 0.225],  # ImageNet stats by default
 )
