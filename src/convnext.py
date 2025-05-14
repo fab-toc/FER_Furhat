@@ -1,15 +1,15 @@
 import copy
 
 import kagglehub
+import matplotlib
 import torch
 import torch.nn as nn
 import torchvision
-from torch.utils.data import DataLoader
-from classifier import eval_classifier, train_classifier
-import matplotlib.pyplot as plt
-import matplotlib
+from torch.utils.data import DataLoader, random_split
 
-matplotlib.use('Agg')  # Use a non-interactive backend
+from classifier import eval_classifier, train_classifier_with_validation
+
+matplotlib.use("Agg")  # Use a non-interactive backend
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -47,12 +47,22 @@ test_data = torchvision.datasets.ImageFolder(
     data_dir + "/test", transform=data_transforms
 )
 
-print("Classes of the dataset:", train_data.classes)
+CLASSES = train_data.classes
+
+# Define the validation set by splitting the training data into 2 subsets (80% training and 20% validation)
+n_train_examples = int(len(train_data) * 0.8)
+n_valid_examples = len(train_data) - n_train_examples
+train_data, valid_data = random_split(train_data, [n_train_examples, n_valid_examples])
+
+print(len(train_data), len(valid_data))
+
+
+print("Classes of the dataset:", CLASSES)
 print("Number of training samples:", len(train_data))
 print("Number of test samples:", len(test_data))
 
 # Pour afficher le mapping complet
-for idx, emotion in enumerate(train_data.classes):
+for idx, emotion in enumerate(CLASSES):
     print(f"Label {idx} → {emotion}")
 
 batch_size = 256
@@ -79,6 +89,17 @@ test_dataloader = DataLoader(
     prefetch_factor=6,
 )
 
+valid_dataloader = DataLoader(
+    valid_data,
+    batch_size=batch_size,
+    shuffle=True,
+    drop_last=True,
+    num_workers=12,
+    pin_memory=True,
+    persistent_workers=True,
+    prefetch_factor=6,
+)
+
 # - print the number of batches in the training subset
 num_batches = len(train_dataloader)
 print("Number of batches in the training subset:", num_batches)
@@ -86,6 +107,10 @@ print("Number of batches in the training subset:", num_batches)
 # - print the number of batches in the testing subset
 num_batches = len(test_dataloader)
 print("Number of batches in the testing subset:", num_batches)
+
+# - print the number of batches in the validation subset
+num_batches = len(valid_dataloader)
+print("Number of batches in the validation subset:", num_batches)
 
 
 weights = torchvision.models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1
@@ -114,20 +139,21 @@ num_epochs = 30
 learning_rate = 0.0005
 loss_fn = nn.CrossEntropyLoss()
 
-# model_trained, train_losses = train_classifier(
-#     model=model,
-#     train_dataloader=train_dataloader,
-#     batch_size=batch_size,
-#     num_epochs=num_epochs,
-#     loss_fn=loss_fn,
-#     optimizer_class=torch.optim.Adam,
-#     learning_rate=learning_rate,
-#     device=device,
-#     transform_fn=None,
-#     verbose=True,
-# )
+model_trained, train_losses, val_accuracies = train_classifier_with_validation(
+    model=model,
+    train_dataloader=train_dataloader,
+    valid_dataloader=valid_dataloader,
+    batch_size=batch_size,
+    num_epochs=num_epochs,
+    loss_fn=loss_fn,
+    optimizer_class=torch.optim.Adam,
+    learning_rate=learning_rate,
+    device=device,
+    transform_fn=None,
+    verbose=True,
+)
 
-# torch.save(model_trained.state_dict(), "training/convnext_tiny_30.pt")
+torch.save(model_trained.state_dict(), "training/convnext_tiny_30.pt")
 
 model_test = copy.deepcopy(model)
 model_test.load_state_dict(torch.load("training/convnext_tiny_30.pt"))
