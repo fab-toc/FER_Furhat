@@ -430,7 +430,7 @@ def save_model(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         )
         # Create training directory at the project root
-        base_dir = os.path.join(project_root, "training")
+        base_dir = os.path.join(project_root, "trained")
 
     # Create a subdirectory with the model_name
     model_dir = os.path.join(base_dir, model_name)
