@@ -494,7 +494,6 @@ def get_data_transforms(
             transform_list.append(transforms.RandomVerticalFlip())
             transform_list.append(transforms.RandomRotation(10))
             transform_list.append(transforms.RandomAffine(0, translate=(0.1, 0.1)))
-            transform_list.append(transforms.ColorJitter(brightness=0.2, contrast=0.2))
 
         if augmentation_level == "light":
             transform_list.append(transforms.RandomHorizontalFlip())
@@ -509,6 +508,9 @@ def get_data_transforms(
 
     # Always resize to target size
     transform_list.append(transforms.Resize(target_size))
+
+    if augmentation_level == "heavy":
+        transform_list.append(transforms.ColorJitter(brightness=0.2, contrast=0.2))
 
     # Convert to tensor
     transform_list.append(transforms.ToTensor())
