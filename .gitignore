@@ -17,4 +17,6 @@ wheels/
 
 # Model files
 trained/
-data/
+
+# Dataset files
+dataset/
