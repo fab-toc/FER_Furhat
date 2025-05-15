@@ -539,7 +539,7 @@ def train_classifier_with_validation(
 
     optimizer = optimizer_class(model_tr.parameters(), **{"lr": learning_rate})  # type: ignore
 
-    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=2)
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=1)
 
     # Initialize a list for storing the training loss over epochs
     train_losses = []

@@ -37,20 +37,20 @@ emotions_to_exclude = ["surprise", "neutral", "disgust"]
 # Use the optimal parameters
 num_workers = 10
 prefetch_factor = 4
-augmentation_level = "medium"  # Options: "none", "light", "medium", "heavy"
+augmentation_level = "heavy"  # Options: "none", "light", "medium", "heavy"
 
 model_name: Literal["vgg", "convnext"] = "convnext"
 model_version: Literal["11", "13", "16", "19", "tiny", "small", "base", "large"] = (
     "tiny"
 )
 
-batch_size = 512
+batch_size = 1024
 num_epochs: int = 20
 learning_rate: float = 1e-4
 loss_fn: nn.Module = nn.CrossEntropyLoss()
 
 unfreeze_feature_layer_start: int = (
-    6  # Unfreeze the feature layers starting from this one
+    5  # Unfreeze the feature layers starting from this one
 )
 
 # Print all hyperparameters for verification
