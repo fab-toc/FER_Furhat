@@ -64,7 +64,7 @@ print("================================\n")
 
 
 ######################## DATASET ########################
-data_dir = data_dir = os.path.join(
+data_dir = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "dataset",
 )
@@ -158,6 +158,17 @@ model = get_model(
     model_version=model_version,
     num_classes=len(CLASSES),
     unfreeze_feature_layer_start=unfreeze_feature_layer_start,
+)
+
+model.load_state_dict(
+    torch.load(
+        os.path.join(
+            os.path.dirname(data_dir),
+            "trained",
+            model_name,
+            f"{model_name}_{model_version}_b{256}_l{unfreeze_feature_layer_start}:end_e{num_epochs}.pt",
+        )
+    )
 )
 
 
