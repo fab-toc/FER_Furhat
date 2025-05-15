@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torchvision
 from torch.utils.data import DataLoader
+
 from train.utils import (
     eval_classifier,
     get_data_transforms,
@@ -28,32 +29,32 @@ torch.backends.cudnn.allow_tf32 = True
 
 
 ######################## HYPER PARAMETERS ########################
-emotions_to_exclude = ["surprise", "neutral", "disgust"]
-
-# Use the optimal parameters
 num_workers = 10
 prefetch_factor = 4
 augmentation_level = "heavy"  # Options: "none", "light", "medium", "heavy"
 
 model_name: Literal["vgg", "convnext"] = "convnext"
 model_version: Literal["11", "13", "16", "19", "tiny", "small", "base", "large"] = (
-    "tiny"
+    "large"
 )
 
-batch_size = 16
+batch_size = 32
 num_epochs: int = 20
 learning_rate: float = 1e-4
 loss_fn: nn.Module = nn.CrossEntropyLoss()
 
 unfreeze_feature_layer_start: int = (
-    2  # Unfreeze the feature layers starting from this one
+    3  # Unfreeze the feature layers starting from this one
 )
 
-model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../trained/{model_name}_{model_version}_b{512}_l{unfreeze_feature_layer_start}_end_e{num_epochs}.pt")
+model_path = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "trained",
+    f"fine-tuned_{model_name}_{model_version}_b{batch_size}_l{unfreeze_feature_layer_start}_end_e{num_epochs}.pt",
+)
 
 # Print all hyperparameters for verification
 print("\n======== HYPERPARAMETERS ========")
-print(f"Emotions to exclude: {emotions_to_exclude}")
 print(f"Augmentation level: {augmentation_level}")
 print(f"Model name: {model_name}")
 print(f"Model version: {model_version}")
@@ -68,7 +69,9 @@ print("================================\n")
 
 
 ######################## DATASET ########################
-data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+data_dir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dataset"
+)
 
 data_transforms = get_data_transforms(
     input_format="rgb",
@@ -82,7 +85,7 @@ data_transforms = get_data_transforms(
 
 # Load the dataset
 test_data = torchvision.datasets.ImageFolder(
-    os.path.join(data_dir, "test"),
+    data_dir,
     transform=data_transforms,
 )
 
@@ -111,7 +114,6 @@ test_dataloader = DataLoader(
     prefetch_factor=prefetch_factor,
 )
 
-
 num_batches = len(test_dataloader)
 print("Number of batches in the testing subset:", num_batches)
 
@@ -124,10 +126,6 @@ model = get_model(
     num_classes=len(CLASSES),
     unfreeze_feature_layer_start=unfreeze_feature_layer_start,
 )
-
-# Print model structure to understand what we're working with
-print("\nModel structure:")
-print(model, "\n")
 
 
 ######################## TESTING ########################
