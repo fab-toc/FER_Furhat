@@ -17,3 +17,4 @@ wheels/
 
 # Model files
 trained/
+data/
