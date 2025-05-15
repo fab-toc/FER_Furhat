@@ -50,6 +50,7 @@ unfreeze_feature_layer_start: int = (
 model_path = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "trained",
+    model_name,
     f"fine-tuned_{model_name}_{model_version}_b{batch_size}_l{unfreeze_feature_layer_start}_end_e{num_epochs}.pt",
 )
 
