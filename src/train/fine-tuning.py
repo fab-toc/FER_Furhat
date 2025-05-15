@@ -14,7 +14,6 @@ from utils import (
     train_classifier_with_validation,
 )
 
-# # Set up the script
 # args = parse_args()
 
 # Set the random seed for reproducibility

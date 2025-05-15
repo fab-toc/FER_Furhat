@@ -1,15 +1,172 @@
 import os
+import queue
+import random
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
 import pyrealsense2 as rs
+import requests
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
 from train.utils import get_data_transforms, get_model
+
+
+class FurhatController:
+    def __init__(self, host="192.168.10.14", port=54321):
+        self.base_url = f"http://{host}:{port}"
+        self.speaking = False
+        self.emotion_queue = queue.Queue()
+        self.current_emotion = None
+        self.worker_thread = threading.Thread(
+            target=self._process_emotions, daemon=True
+        )
+        self.worker_thread.start()
+
+        # Messages par émotion
+        self.messages = {
+            "angry": [
+                "Je ressens de la colère. C'est une émotion forte.",
+                "La colère peut être difficile à gérer parfois.",
+                "Quand on est en colère, il faut essayer de respirer profondément.",
+                "La colère est parfois justifiée, mais il faut savoir la canaliser.",
+            ],
+            "fear": [
+                "J'ai peur. C'est une émotion qui nous protège du danger.",
+                "La peur peut parfois nous paralyser.",
+                "Respirer calmement peut aider à surmonter la peur.",
+                "La peur est naturelle, elle fait partie de nous.",
+            ],
+            "happy": [
+                "Je suis heureux! C'est agréable de ressentir de la joie.",
+                "Le bonheur est un état merveilleux à partager.",
+                "Sourire est contagieux, essayez de sourire à quelqu'un aujourd'hui!",
+                "La joie illumine notre journée et celle des autres.",
+            ],
+            "sad": [
+                "Je me sens triste. C'est normal d'être triste parfois.",
+                "La tristesse fait partie de la vie, comme la joie.",
+                "Exprimer sa tristesse peut aider à se sentir mieux.",
+                "Après la pluie vient le beau temps, la tristesse ne dure pas éternellement.",
+            ],
+        }
+
+        # Couleurs LED par émotion (format RGB)
+        self.colors = {
+            "angry": {"r": 255, "g": 0, "b": 0},  # Rouge
+            "fear": {"r": 128, "g": 0, "b": 128},  # Violet
+            "happy": {"r": 255, "g": 255, "b": 0},  # Jaune
+            "sad": {"r": 0, "g": 0, "b": 255},  # Bleu
+        }
+
+        self.expressions = {
+            "angry": "Angry",
+            "fear": "Afraid",
+            "happy": "Happy",
+            "sad": "Sad",
+        }
+
+        try:
+            res = requests.get(f"{self.base_url}/furhat")
+            print("✅ Connexion réussie au robot Furhat")
+
+            self.set_voice("Margaux", "French")
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur lors de la connexion au robot Furhat: {e}")
+
+    def set_voice(self, voice_name, language="French"):
+        """Configure la voix du robot."""
+        url = f"{self.base_url}/voice"
+        data = {"name": voice_name, "language": language}
+        try:
+            response = requests.put(url, json=data)
+            response.raise_for_status()
+            return True
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur lors de la configuration de la voix: {e}")
+            return False
+
+    def set_led(self, r, g, b):
+        """Change la couleur de la LED."""
+        url = f"{self.base_url}/led"
+        data = {"red": r, "green": g, "blue": b}
+        try:
+            response = requests.put(url, json=data)
+            response.raise_for_status()
+            return True
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur lors du changement de la LED: {e}")
+            return False
+
+    def set_face(self, expression):
+        """Change l'expression faciale du robot."""
+        url = f"{self.base_url}/faces"
+        data = {"name": expression}
+        try:
+            response = requests.put(url, json=data)
+            response.raise_for_status()
+            return True
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur lors du changement d'expression: {e}")
+            return False
+
+    def say(self, text):
+        """Fait parler le robot et gère l'état 'speaking'."""
+        url = f"{self.base_url}/say"
+        data = {"text": text, "blocking": True}
+
+        self.speaking = True
+        try:
+            response = requests.post(url, json=data)
+            response.raise_for_status()
+            self.speaking = False
+            return True
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur lors de la parole: {e}")
+            self.speaking = False
+            return False
+
+    def is_speaking(self):
+        """Vérifie si le robot est en train de parler."""
+        url = f"{self.base_url}/status"
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            status = response.json()
+            return status.get("speaking", False)
+        except requests.exceptions.RequestException as e:
+            print(f"Erreur lors de la vérification du statut: {e}")
+            return self.speaking  # Fallback sur l'état interne
+
+    def handle_emotion(self, emotion):
+        """Ajoute une émotion à la file d'attente pour traitement."""
+        if emotion != self.current_emotion:
+            self.emotion_queue.put(emotion)
+
+    def _process_emotions(self):
+        """Thread worker qui traite les émotions en file d'attente."""
+        while True:
+            if not self.emotion_queue.empty() and not self.is_speaking():
+                emotion = self.emotion_queue.get()
+                self.current_emotion = emotion
+
+                # Changer expression et LED
+                self.set_face(self.expressions.get(emotion, "Neutral"))
+                color = self.colors.get(emotion, {"r": 255, "g": 255, "b": 255})
+                self.set_led(color["r"], color["g"], color["b"])
+
+                # Dire une phrase aléatoire correspondant à l'émotion
+                messages = self.messages.get(
+                    emotion, ["Je ne sais pas comment me sentir."]
+                )
+                message = random.choice(messages)
+                self.say(message)
+
+            time.sleep(0.5)  # Vérifier toutes les 500ms
 
 
 # === Dataset en mémoire ===
