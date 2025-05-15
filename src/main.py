@@ -60,12 +60,17 @@ pipeline.start(config)
 # === Créer UNE SEULE fenêtre ===
 cv2.namedWindow("Visages détectés", cv2.WINDOW_NORMAL)
 
-output_dir = "test"
+output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "test","fake_class")
+if os.path.exists(output_dir):
+    for filename in os.listdir(output_dir):
+        file_path = os.path.join(output_dir, filename)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
 os.makedirs(output_dir, exist_ok=True)
 
 # === Initialisation du timer ===
 last_capture_time = time.time()
-
+i = 0
 print("✅ Caméra en cours. Appuie sur 'q' pour quitter.")
 
 try:
@@ -81,20 +86,22 @@ try:
 
         # Détection de visages
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+        
 
         # Si des visages sont détectés
         current_time = time.time()
         if len(faces) > 0:
-            for i, (x, y, w, h) in enumerate(faces):
+            for _, (x, y, w, h) in enumerate(faces):
 
                 # Capturer toutes les 0.5 secondes
-                if current_time - last_capture_time >= 0.5:
+                if current_time - last_capture_time >= 0.2:
                     face_crop = color_image[y:y+h, x:x+w].copy()
                     timestamp = time.strftime("%Y%m%d-%H%M%S")
                     filename = os.path.join(output_dir, f"face_{timestamp}_{i}.jpg")
                     cv2.imwrite(filename, face_crop)
                     print(f"📸 Visage enregistré : {filename}")
                     last_capture_time = current_time
+                    i += 1
 
                 # Dessiner le rectangle vert
                 cv2.rectangle(color_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -134,7 +141,7 @@ emotions_to_exclude = ["surprise", "neutral", "disgust"]
 # Use the optimal parameters
 num_workers = 10
 prefetch_factor = 4
-augmentation_level = "heavy"  # Options: "none", "light", "medium", "heavy"
+augmentation_level = "none"  # Options: "none", "light", "medium", "heavy"
 
 model_name: Literal["vgg", "convnext"] = "convnext"
 model_version: Literal["11", "13", "16", "19", "tiny", "small", "base", "large"] = (
@@ -166,16 +173,16 @@ data_transforms = get_data_transforms(
 
 
 
-
+class_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "test")
 
 # Load the dataset
 train_data = torchvision.datasets.ImageFolder(
-    os.path.join(data_dir, output_dir),
+    os.path.join(data_dir, class_dir),
     transform=data_transforms,
 )
 
 
-test_dataloader = DataLoader(train_data, batch_size=8, shuffle=True,drop_last=True,num_workers=num_workers,pin_memory=True,persistent_workers=True,prefetch_factor=prefetch_factor,)
+test_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True,drop_last=True,num_workers=num_workers,pin_memory=True,persistent_workers=True,prefetch_factor=prefetch_factor,)
 
 
 # Get the model based on the hyperparameters
@@ -195,11 +202,48 @@ print(model, "\n")
 model_test = copy.deepcopy(model)
 model_test.load_state_dict(torch.load(model_path))
 
-# - Apply the evaluation function using the test dataloader
-test_accuracy, avg_loss = eval_classifier(
-    model=model_test, eval_dataloader=test_dataloader, device=device, loss_fn=loss_fn
-)
+# Set the model in 'evaluation' mode (this disables some layers (batch norm, dropout...) which are not needed when testing)
+model_test.eval()
 
-print("======== TEST RESULTS ========")
-print("Test accuracy: {:.2f}%".format(test_accuracy))
-print("Average loss: {:.4f}".format(avg_loss))
+model_test.to(device, non_blocking=True)
+
+# initialize the total and correct number of labels to compute the accuracy
+correct_labels = 0
+total_labels = 0
+total_loss = 0  # Pour accumuler la perte totale
+labels_predicted = []
+
+# In evaluation phase, we don't need to compute gradients (for memory efficiency)
+with torch.no_grad():
+    # Iterate over the dataset using the dataloader
+    for images, labels in test_dataloader:
+        images = images.to(device, non_blocking=True)
+        labels = labels.to(device, non_blocking=True)
+
+        # Get the predicted labels
+        y_predicted = model_test(images)
+
+
+        _, labels_predicted = torch.max(y_predicted.data, 1)
+
+
+angry = 0
+fear = 0
+happy = 0
+sad = 0
+
+for resultat in labels_predicted:
+    if resultat == 0:
+        angry +=1
+    elif resultat == 1:
+        fear +=1
+    elif resultat == 2:
+        happy +=1
+    elif resultat == 3:
+        sad +=1
+
+emotions = {'Angry': angry, 'Fear': fear, 'Happy': happy, 'Sad': sad}
+current_emotion = max(emotions, key=emotions.get)
+print("Emotion :", current_emotion)
+
+

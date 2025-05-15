@@ -81,17 +81,12 @@ data_transforms = get_data_transforms(
 
 
 # Load the dataset
-train_data = torchvision.datasets.ImageFolder(
-    os.path.join(data_dir, "train"),
-    transform=data_transforms,
-)
-
 test_data = torchvision.datasets.ImageFolder(
     os.path.join(data_dir, "test"),
     transform=data_transforms,
 )
 
-CLASSES = train_data.classes
+CLASSES = test_data.classes
 print("Classes of the dataset:", CLASSES)
 
 # Print the mapping of labels to emotions
@@ -100,22 +95,10 @@ for idx, emotion in enumerate(CLASSES):
     print(f"Label {idx} → {emotion}")
 
 
-print(f"\nNumber of train samples: {len(train_data)}")
 print(f"Number of test samples: {len(test_data)}")
 
 
 ######################## DATALOADERS ########################
-train_dataloader = DataLoader(
-    train_data,
-    batch_size=batch_size,
-    shuffle=True,
-    drop_last=True,
-    num_workers=num_workers,
-    pin_memory=True,
-    persistent_workers=True,
-    prefetch_factor=prefetch_factor,
-)
-
 
 test_dataloader = DataLoader(
     test_data,
@@ -127,9 +110,6 @@ test_dataloader = DataLoader(
     persistent_workers=True,
     prefetch_factor=prefetch_factor,
 )
-
-num_batches = len(train_dataloader)
-print("Number of batches in the training subset:", num_batches)
 
 
 num_batches = len(test_dataloader)
