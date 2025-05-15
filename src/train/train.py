@@ -1,13 +1,12 @@
-import copy
-import os
-import shutil
-from typing import Literal
+import os.path as path
+from copy import deepcopy
+from shutil import rmtree
 
-import kagglehub
 import torch
-import torch.nn as nn
-import torchvision
+from kagglehub import dataset_download
+from torch.nn import CrossEntropyLoss, Module
 from torch.utils.data import DataLoader, random_split
+from torchvision.datasets import ImageFolder
 from utils import (
     eval_classifier,
     get_data_transforms,
@@ -16,95 +15,75 @@ from utils import (
     train_classifier_with_validation,
 )
 
-# # Set up the script
 # args = parse_args()
 
 # Set the random seed for reproducibility
 torch.manual_seed(0)
 
-# # Automatic configuration of PyTorch settings
-# hw_info, optimal_params = setup_pytorch_optimal(verbose=True)
-
+# Some optimizations for CUDA
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.allow_tf32 = True
 
 
-######################## HYPER PARAMETERS ########################
-emotions_to_exclude = ["surprise", "neutral", "disgust"]
+# ================ HYPER PARAMETERS ================
+EMOTIONS_TO_EXCLUDE = ["surprise", "neutral", "disgust"]
 
-# Use the optimal parameters
-num_workers = 10
-prefetch_factor = 4
-augmentation_level = "heavy"  # Options: "none", "light", "medium", "heavy"
+NUM_WORKERS = 12
+PREFETCH_FACTOR = 4
+AUGMENTATION_LEVEL = "heavy"  # Options: "none", "light", "medium", "heavy"
 
-model_name: Literal["vgg", "convnext"] = "convnext"
-model_version: Literal["11", "13", "16", "19", "tiny", "small", "base", "large"] = (
-    "tiny"
+MODEL_NAME = "convnext"  # Options: "convnext", "vgg"
+MODEL_VERSION = (
+    "large"  # Options: "11", "13", "16", "19", "tiny", "small", "base", "large"
 )
 
-batch_size = 1024
-num_epochs: int = 20
-learning_rate: float = 1e-4
-loss_fn: nn.Module = nn.CrossEntropyLoss()
+BATCH_SIZE = 256
+EPOCHS: int = 15
+LR: float = 1e-4
+LOSS_FN: Module = CrossEntropyLoss()
 
-unfreeze_feature_layer_start: int = (
-    5  # Unfreeze the feature layers starting from this one
-)
-
-# Print all hyperparameters for verification
-print("\n======== HYPERPARAMETERS ========")
-print(f"Emotions to exclude: {emotions_to_exclude}")
-print(f"Augmentation level: {augmentation_level}")
-print(f"Model name: {model_name}")
-print(f"Model version: {model_version}")
-print(f"Batch size: {batch_size}")
-print(f"Number of epochs: {num_epochs}")
-print(f"Learning rate: {learning_rate}")
-print(f"Unfreeze feature layers starting from: {unfreeze_feature_layer_start}")
-print(f"Number of workers: {num_workers}")
-print(f"Prefetch factor: {prefetch_factor}")
-print(f"Device: {device}")
-print("================================\n")
+UNFREEZE_LAYER_START: int = 5  # Unfreeze the feature layers starting from this one
 
 
-######################## DATASET ########################
-data_dir = kagglehub.dataset_download("msambare/fer2013")
+# ================ DATASET ================
+data_dir = dataset_download("msambare/fer2013")
 
 data_transforms = get_data_transforms(
     input_format="grayscale",
-    target_channels=3,  # Target channels for the model
-    target_size=(224, 224),  # Target size of each image for the model used
-    augmentation_level=augmentation_level,
-    custom_means=[0.485, 0.456, 0.406],  # ImageNet stats by default
-    custom_stds=[0.229, 0.224, 0.225],  # ImageNet stats by default
+    target_channels=3,
+    target_size=(224, 224),
+    augmentation_level=AUGMENTATION_LEVEL,
+    custom_means=[0.485, 0.456, 0.406],
+    custom_stds=[0.229, 0.224, 0.225],
 )
 
 # Remove the directories of the excluded emotions
 for split in ["train", "test"]:
-    split_dir = os.path.join(data_dir, split)
-    for emotion in emotions_to_exclude:
-        emotion_dir = os.path.join(split_dir, emotion)
-        if os.path.exists(emotion_dir):
+    split_dir = path.join(data_dir, split)
+
+    for emotion in EMOTIONS_TO_EXCLUDE:
+        emotion_dir = path.join(split_dir, emotion)
+
+        if path.exists(emotion_dir):
             print(f"Removing directory {emotion_dir}")
-            shutil.rmtree(emotion_dir)
+            rmtree(emotion_dir)
 
 # Load the dataset
-train_data = torchvision.datasets.ImageFolder(
-    os.path.join(data_dir, "train"),
+train_data = ImageFolder(
+    path.join(data_dir, "train"),
     transform=data_transforms,
 )
 
-test_data = torchvision.datasets.ImageFolder(
-    os.path.join(data_dir, "test"),
+test_data = ImageFolder(
+    path.join(data_dir, "test"),
     transform=data_transforms,
 )
 
 CLASSES = train_data.classes
 print("Classes of the dataset:", CLASSES)
 
-# Print the mapping of labels to emotions
 print("\nMapping of labels to emotions:")
 for idx, emotion in enumerate(CLASSES):
     print(f"Label {idx} → {emotion}")
@@ -119,97 +98,85 @@ print(f"Number of validation samples: {len(valid_data)}")
 print(f"Number of test samples: {len(test_data)}")
 
 
-######################## DATALOADERS ########################
+# ================ DATALOADERS ================
 train_dataloader = DataLoader(
     train_data,
-    batch_size=batch_size,
+    batch_size=BATCH_SIZE,
     shuffle=True,
     drop_last=True,
-    num_workers=num_workers,
+    num_workers=NUM_WORKERS,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=prefetch_factor,
+    prefetch_factor=PREFETCH_FACTOR,
 )
 
 valid_dataloader = DataLoader(
     valid_data,
-    batch_size=batch_size,
+    batch_size=BATCH_SIZE,
     shuffle=True,
     drop_last=True,
-    num_workers=num_workers,
+    num_workers=NUM_WORKERS,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=prefetch_factor,
+    prefetch_factor=PREFETCH_FACTOR,
 )
 
 test_dataloader = DataLoader(
     test_data,
-    batch_size=batch_size,
+    batch_size=BATCH_SIZE,
     shuffle=True,
     drop_last=True,
-    num_workers=num_workers,
+    num_workers=NUM_WORKERS,
     pin_memory=True,
     persistent_workers=True,
-    prefetch_factor=prefetch_factor,
+    prefetch_factor=PREFETCH_FACTOR,
 )
 
-num_batches = len(train_dataloader)
-print("Number of batches in the training subset:", num_batches)
-
-num_batches = len(valid_dataloader)
-print("Number of batches in the validation subset:", num_batches)
-
-num_batches = len(test_dataloader)
-print("Number of batches in the testing subset:", num_batches)
+print("\nNumber of batches in the training subset:", len(train_dataloader))
+print("Number of batches in the validation subset:", len(valid_dataloader))
+print("Number of batches in the testing subset:", len(test_dataloader))
 
 
-######################## MODEL ########################
-# Get the model based on the hyperparameters
+# ================ MODEL =================
 model = get_model(
-    model_name=model_name,
-    model_version=model_version,
+    model_name=MODEL_NAME,
+    model_version=MODEL_VERSION,
     num_classes=len(CLASSES),
-    unfreeze_feature_layer_start=unfreeze_feature_layer_start,
+    unfreeze_layer_start=UNFREEZE_LAYER_START,
 )
 
-# Print model structure to understand what we're working with
-print("\nModel structure:")
-print(model, "\n")
 
-
-######################## TRAINING ########################
+# ================ TRAINING =================
 model_trained, train_losses, val_accuracies = train_classifier_with_validation(
     model=model,
     train_dataloader=train_dataloader,
     valid_dataloader=valid_dataloader,
-    batch_size=batch_size,
-    num_epochs=num_epochs,
-    loss_fn=loss_fn,
+    batch_size=BATCH_SIZE,
+    num_epochs=EPOCHS,
+    loss_fn=LOSS_FN,
     optimizer_class=torch.optim.Adam,
-    learning_rate=learning_rate,
+    learning_rate=LR,
     device=device,
-    transform_fn=None,
     verbose=True,
 )
 
-# Call the function with the trained model and parameters
 model_path = save_model(
     model=model_trained,
-    model_name=model_name,
-    model_version=model_version,
-    batch_size=batch_size,
-    unfreeze_layer_start=unfreeze_feature_layer_start,
-    num_epochs=num_epochs,
+    model_name=MODEL_NAME,
+    model_version=MODEL_VERSION,
+    batch_size=BATCH_SIZE,
+    unfreeze_layer_start=UNFREEZE_LAYER_START,
+    num_epochs=EPOCHS,
 )
 
 
-######################## TESTING ########################
-model_test = copy.deepcopy(model)
+# ================ TESTING =================
+model_test = deepcopy(model)
 model_test.load_state_dict(torch.load(model_path))
 
-# - Apply the evaluation function using the test dataloader
+# Apply the evaluation function using the test dataloader
 test_accuracy, avg_loss = eval_classifier(
-    model=model_test, eval_dataloader=test_dataloader, device=device, loss_fn=loss_fn
+    model=model_test, eval_dataloader=test_dataloader, device=device, loss_fn=LOSS_FN
 )
 
 print("======== TEST RESULTS ========")

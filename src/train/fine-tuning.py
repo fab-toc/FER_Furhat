@@ -157,7 +157,7 @@ model = get_model(
     model_name=model_name,
     model_version=model_version,
     num_classes=len(CLASSES),
-    unfreeze_feature_layer_start=unfreeze_feature_layer_start,
+    unfreeze_layer_start=unfreeze_feature_layer_start,
 )
 
 model.load_state_dict(

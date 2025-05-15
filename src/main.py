@@ -1,18 +1,16 @@
-import pyrealsense2 as rs
-import numpy as np
-import cv2
-import time
 import os
-from typing import Literal
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
-from torch.utils.data import Dataset, DataLoader
-import copy
-from PIL import Image
+import time
 from concurrent.futures import ThreadPoolExecutor
 
+import cv2
+import numpy as np
+import pyrealsense2 as rs
+import torch
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+
 from train.utils import get_data_transforms, get_model
+
 
 # === Dataset en mémoire ===
 class InMemoryFaceDataset(Dataset):
@@ -47,6 +45,7 @@ pipeline.start(cfg)
 
 cv2.namedWindow("Visages détectés", cv2.WINDOW_NORMAL)
 
+
 # === Hyperparams & modèle ===
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
@@ -63,7 +62,7 @@ MODEL_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
     "trained",
     MODEL_NAME,
-    f"fine-tuned_{MODEL_NAME}_{MODEL_VER}_b{BATCH_SIZE}_l{UNFREEZE_LAYER}_end_e20.pt"
+    f"fine-tuned_{MODEL_NAME}_{MODEL_VER}_b{BATCH_SIZE}_l{UNFREEZE_LAYER}_end_e20.pt",
 )
 
 transforms_pipeline = get_data_transforms(
@@ -80,7 +79,7 @@ base_model = get_model(
     model_name=MODEL_NAME,
     model_version=MODEL_VER,
     num_classes=4,
-    unfreeze_feature_layer_start=UNFREEZE_LAYER,
+    unfreeze_layer_start=UNFREEZE_LAYER,
 )
 base_model.load_state_dict(torch.load(MODEL_PATH))
 base_model.eval()
@@ -89,6 +88,7 @@ base_model.to(device, non_blocking=True)
 # ThreadPool pour l’inférence
 executor = ThreadPoolExecutor(max_workers=1)
 last_prediction = "En attente..."
+
 
 def inference_task(image_batch):
     """Tâche d'inférence, tourne en thread séparé."""
@@ -112,12 +112,17 @@ def inference_task(image_batch):
 
     counts = {"Angry": 0, "Fear": 0, "Happy": 0, "Sad": 0}
     for p in all_preds:
-        if p == 0: counts["Angry"] += 1
-        elif p == 1: counts["Fear"] += 1
-        elif p == 2: counts["Happy"] += 1
-        elif p == 3: counts["Sad"] += 1
+        if p == 0:
+            counts["Angry"] += 1
+        elif p == 1:
+            counts["Fear"] += 1
+        elif p == 2:
+            counts["Happy"] += 1
+        elif p == 3:
+            counts["Sad"] += 1
     dominant = max(counts, key=counts.get)
     return dominant
+
 
 # === Boucle principale ===
 collected = []
@@ -138,34 +143,36 @@ try:
 
         # 2) Capture en mémoire
         if faces is not None and len(collected) < NUM_IMAGES:
-            for (x, y, w, h) in faces:
+            for x, y, w, h in faces:
                 now = time.time()
-                if now - last_capture >= 1/60:
-                    collected.append(img[y:y+h, x:x+w].copy())
+                if now - last_capture >= 1 / 60:
+                    collected.append(img[y : y + h, x : x + w].copy())
                     last_capture = now
-                cv2.rectangle(img, (x, y), (x+w, y+h), (0,255,0), 2)
+                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
         # 3) Lancer inférence quand batch complet
         if len(collected) >= NUM_IMAGES:
             # Submit sans bloquer la boucle
             future = executor.submit(inference_task, list(collected))
-            future.add_done_callback(lambda f: globals().update(last_prediction=f.result()))
+            future.add_done_callback(
+                lambda f: globals().update(last_prediction=f.result())
+            )
             collected.clear()
 
         # 4) Affichage prédiction sur l’image
         cv2.putText(
             img,
-            f"Emotion: {last_prediction}",          # texte
-            (10, 30),                               # position
-            cv2.FONT_HERSHEY_SIMPLEX,               # police :contentReference[oaicite:2]{index=2}
-            1.0,                                    # échelle
-            (0, 255, 0),                            # couleur BGR :contentReference[oaicite:3]{index=3}
-            2,                                      # épaisseur
-            cv2.LINE_AA
+            f"Emotion: {last_prediction}",  # texte
+            (10, 30),  # position
+            cv2.FONT_HERSHEY_SIMPLEX,  # police :contentReference[oaicite:2]{index=2}
+            1.0,  # échelle
+            (0, 255, 0),  # couleur BGR :contentReference[oaicite:3]{index=3}
+            2,  # épaisseur
+            cv2.LINE_AA,
         )
 
         cv2.imshow("Visages détectés", img)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
 finally:
