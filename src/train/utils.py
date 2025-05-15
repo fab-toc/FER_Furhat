@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument(
         "--model_name",
         type=str,
-        default="vgg",
+        default="convnext",
         choices=["vgg", "convnext"],
         help="Type of model to use (vgg or convnext)",
     )
@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument(
         "--model_version",
         type=str,
-        default="11",
+        default="tiny",
         choices=["11", "13", "16", "19", "tiny", "small", "base", "large"],
         help="Version of the model",
     )
@@ -47,7 +47,7 @@ def parse_args():
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=None,
+        default=512,
         choices=[4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096],
         help="Batch size (default: auto-optimized)",
     )
@@ -73,14 +73,14 @@ def parse_args():
     parser.add_argument(
         "--num_workers",
         type=int,
-        default=None,
+        default=10,
         help="Number of worker threads (default: auto-optimized)",
     )
 
     parser.add_argument(
         "--prefetch_factor",
         type=int,
-        default=None,
+        default=4,
         help="Number of batches to prefetch (default: auto-optimized)",
     )
 

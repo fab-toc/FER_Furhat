@@ -12,30 +12,18 @@ from utils import (
     eval_classifier,
     get_data_transforms,
     get_model,
-    parse_args,
     save_model,
-    setup_pytorch_optimal,
     train_classifier_with_validation,
 )
 
-# Set up the script
-args = parse_args()
+# # Set up the script
+# args = parse_args()
 
 # Set the random seed for reproducibility
 torch.manual_seed(0)
 
-# Automatic configuration of PyTorch settings
-hw_info, optimal_params = setup_pytorch_optimal(verbose=True)
-
-# Use the optimal parameters
-num_workers = (
-    args.num_workers if args.num_workers is not None else optimal_params["num_workers"]
-)
-prefetch_factor = (
-    args.prefetch_factor
-    if args.prefetch_factor is not None
-    else optimal_params["prefetch_factor"]
-)
+# # Automatic configuration of PyTorch settings
+# hw_info, optimal_params = setup_pytorch_optimal(verbose=True)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -43,35 +31,34 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 ######################## HYPER PARAMETERS ########################
 emotions_to_exclude = ["surprise", "neutral", "disgust"]
 
-augmentation_level = args.augmentation  # Options: "none", "light", "medium", "heavy"
+# Use the optimal parameters
+num_workers = 10
+prefetch_factor = 4
+augmentation_level = "medium"  # Options: "none", "light", "medium", "heavy"
 
-model_name: Literal["vgg", "convnext"] = args.model_name  # Options: "vgg", "convnext"
+model_name: Literal["vgg", "convnext"] = "convnext"
 model_version: Literal["11", "13", "16", "19", "tiny", "small", "base", "large"] = (
-    args.model_version
-)  # Options: "11", "13", "16", "19", "tiny", "small", "base", "large"
-
-
-batch_size = (
-    args.batch_size if args.batch_size is not None else optimal_params["batch_size"]
+    "tiny"
 )
-# batch_size: int = 256
-num_epochs: int = args.epochs
-learning_rate: float = args.lr
+
+batch_size = 512
+num_epochs: int = 20
+learning_rate: float = 1e-4
 loss_fn: nn.Module = nn.CrossEntropyLoss()
 
 unfreeze_feature_layer_start: int = (
-    args.unfreeze_layer
-)  # Unfreeze the feature layers starting from this one
+    6  # Unfreeze the feature layers starting from this one
+)
 
 # Print all hyperparameters for verification
 print("\n======== HYPERPARAMETERS ========")
+print(f"Emotions to exclude: {emotions_to_exclude}")
+print(f"Augmentation level: {augmentation_level}")
 print(f"Model name: {model_name}")
 print(f"Model version: {model_version}")
 print(f"Batch size: {batch_size}")
 print(f"Number of epochs: {num_epochs}")
 print(f"Learning rate: {learning_rate}")
-print(f"Augmentation level: {augmentation_level}")
-print(f"Emotions to exclude: {emotions_to_exclude}")
 print(f"Unfreeze feature layers starting from: {unfreeze_feature_layer_start}")
 print(f"Number of workers: {num_workers}")
 print(f"Prefetch factor: {prefetch_factor}")
