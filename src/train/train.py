@@ -26,6 +26,9 @@ torch.manual_seed(0)
 # hw_info, optimal_params = setup_pytorch_optimal(verbose=True)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.allow_tf32 = True
 
 
 ######################## HYPER PARAMETERS ########################
