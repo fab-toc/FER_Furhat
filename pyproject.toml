@@ -10,6 +10,7 @@ dependencies = [
     "matplotlib>=3.10.3",
     "opencv-python>=4.11.0.86",
     "pyrealsense2>=2.55.1.6486",
+    "requests>=2.32.3",
 ]
 
 [dependency-groups]
