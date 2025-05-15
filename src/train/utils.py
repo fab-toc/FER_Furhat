@@ -423,6 +423,7 @@ def save_model(
     unfreeze_layer_start: int,
     num_epochs: int,
     base_dir: Optional[str] = None,
+    fine_tuned: bool = False,
 ) -> str:
     if base_dir is None:
         # Get the project root directory (two levels up from the current file)
@@ -436,8 +437,11 @@ def save_model(
     model_dir = os.path.join(base_dir, model_name)
     os.makedirs(model_dir, exist_ok=True)
 
-    # Create a dynamic filename based on model parameters
-    model_filename = f"{model_name}_{model_version}_b{batch_size}_l{unfreeze_layer_start}:end_e{num_epochs}.pt"
+    if fine_tuned:
+        model_filename = f"fine-tuned_{model_name}_{model_version}_b{batch_size}_l{unfreeze_layer_start}:end_e{num_epochs}.pt"
+    else:
+        model_filename = f"{model_name}_{model_version}_b{batch_size}_l{unfreeze_layer_start}:end_e{num_epochs}.pt"
+
     model_path = os.path.join(model_dir, model_filename)
 
     # Save the model
