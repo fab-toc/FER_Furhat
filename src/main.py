@@ -52,16 +52,18 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
 
 NUM_IMAGES = 60
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 NUM_WORKERS = 4
 PREFETCH = 2
 
 MODEL_NAME = "convnext"
-MODEL_VER = "tiny"
-UNFREEZE_LAYER = 2
+MODEL_VER = "large"
+UNFREEZE_LAYER = 3
 MODEL_PATH = os.path.join(
-    os.path.dirname(__file__),
-    f"../trained/{MODEL_NAME}_{MODEL_VER}_b512_l{UNFREEZE_LAYER}_end_e20.pt"
+    os.path.dirname(os.path.dirname(__file__)),
+    "trained",
+    MODEL_NAME,
+    f"fine-tuned_{MODEL_NAME}_{MODEL_VER}_b{BATCH_SIZE}_l{UNFREEZE_LAYER}_end_e20.pt"
 )
 
 transforms_pipeline = get_data_transforms(

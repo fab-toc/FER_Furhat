@@ -166,7 +166,7 @@ model.load_state_dict(
             os.path.dirname(data_dir),
             "trained",
             model_name,
-            f"{model_name}_{model_version}_b{256}_l{unfreeze_feature_layer_start}:end_e{num_epochs}.pt",
+            f"{model_name}_{model_version}_b{256}_l{unfreeze_feature_layer_start}_end_e{num_epochs}.pt",
         )
     )
 )

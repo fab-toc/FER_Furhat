@@ -438,9 +438,9 @@ def save_model(
     os.makedirs(model_dir, exist_ok=True)
 
     if fine_tuned:
-        model_filename = f"fine-tuned_{model_name}_{model_version}_b{batch_size}_l{unfreeze_layer_start}:end_e{num_epochs}.pt"
+        model_filename = f"fine-tuned_{model_name}_{model_version}_b{batch_size}_l{unfreeze_layer_start}_end_e{num_epochs}.pt"
     else:
-        model_filename = f"{model_name}_{model_version}_b{batch_size}_l{unfreeze_layer_start}:end_e{num_epochs}.pt"
+        model_filename = f"{model_name}_{model_version}_b{batch_size}_l{unfreeze_layer_start}_end_e{num_epochs}.pt"
 
     model_path = os.path.join(model_dir, model_filename)
 
