@@ -5,11 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 import cv2
 import numpy as np
 import pyrealsense2 as rs
-import requests
 import torch
 
 # Import de l'API Furhat
-from furhat_remote_api import FurhatRemoteAPI  # Ajout de LedColor
+from furhat_remote_api import FurhatRemoteAPI
+from furhat_remote_api.api import LedColor
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
@@ -75,10 +75,10 @@ EMOTION_PHRASES = {
 
 # Couleurs LED pour chaque émotion
 EMOTION_TO_LED_COLOR = {
-    "Angry": (255, 0, 0),  # Rouge
-    "Fear": (143, 0, 255),  # Violet
-    "Happy": (255, 255, 0),  # Jaune
-    "Sad": (0, 0, 255),  # Bleu
+    "Angry": LedColor(r=255, g=0, b=0),  # Rouge
+    "Fear": LedColor(r=143, g=0, b=255),  # Violet
+    "Happy": LedColor(r=255, g=255, b=0),  # Jaune
+    "Sad": LedColor(r=0, g=0, b=255),  # Bleu
 }
 
 # === Initialisation caméra & visage ===
@@ -202,11 +202,10 @@ def update_furhat_emotion(emotion):
         furhat_gesture = EMOTION_TO_FURHAT_GESTURE.get(emotion, "ExpressionNeutral")
         furhat.gesture(name=furhat_gesture)
 
-        # Changer la couleur de la LED via l'API REST
+        # Changer la couleur de la LED
         led_color = EMOTION_TO_LED_COLOR.get(emotion)
         if led_color:
-            r, g, b = led_color
-            set_led_via_rest(FURHAT_IP, r, g, b)
+            furhat.set_led(led_color)
 
         # Choisir et dire une phrase correspondant à l'émotion
         import random
@@ -237,32 +236,6 @@ def handle_inference_result(future):
     executor.submit(update_furhat_emotion, emotion)
 
 
-# Fonction pour contrôler les LEDs via l'API REST
-def set_led_via_rest(ip, r, g, b):
-    """
-    Contrôle les LEDs de Furhat via l'API REST.
-
-    Args:
-        ip (str): Adresse IP du robot Furhat
-        r, g, b (int): Valeurs RGB (0-255) pour la couleur de la LED
-    """
-    url = f"http://{ip}:{FURHAT_PORT}/furhat/led"
-    payload = {
-        "red": r / 255.0,  # L'API REST attend des valeurs entre 0 et 1
-        "green": g / 255.0,
-        "blue": b / 255.0,
-    }
-
-    try:
-        response = requests.put(url, json=payload)
-        if response.status_code == 200:
-            print(f"LED color set to RGB({r},{g},{b})")
-        else:
-            print(f"Failed to set LED color: {response.status_code} - {response.text}")
-    except Exception as e:
-        print(f"Error setting LED color via REST API: {e}")
-
-
 # === Boucle principale ===
 collected = []
 last_capture = time.time()
@@ -274,16 +247,6 @@ try:
     furhat.gesture(name="ExpressionNeutral")
     furhat.attend(attention_target="CAMERA")
 
-    # Vérifier que la connexion est établie
-    status = furhat.get_state()
-    print(f"✅ Connecté à Furhat: {status.get('characterName', 'Unknown')}")
-except Exception as e:
-    print(f"❌ Échec de connexion à Furhat: {e}")
-    print("⚠️ Le programme continuera sans contrôle du robot Furhat.")
-    # Désactiver les fonctionnalités liées à Furhat
-    furhat = None
-
-try:
     while True:
         # 1) Lecture & détection visage
         frames = pipeline.wait_for_frames()
@@ -347,10 +310,9 @@ finally:
     # Remettre Furhat en état neutre avant de terminer
     try:
         furhat.gesture(name="ExpressionNeutral")
-        # Utiliser l'API REST pour éteindre les LEDs
-        set_led_via_rest(FURHAT_IP, 0, 0, 0)
-    except Exception as e:
-        print(f"Erreur lors de la remise à zéro de Furhat: {e}")
+        furhat.set_led(LedColor(r=0, g=0, b=0))  # Éteindre la LED
+    except:
+        pass
 
     executor.shutdown(wait=True)
     print("🧼 Caméra arrêtée, connexion Furhat fermée.")
