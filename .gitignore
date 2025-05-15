@@ -16,4 +16,7 @@ wheels/
 .env
 
 # Model files
-training/
+trained/
+
+# Dataset files
+dataset/

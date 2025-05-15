@@ -3,8 +3,14 @@ name = "tpe_issd"
 version = "0.1.0"
 description = "Facial expression recognition using deep learning"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = ["kagglehub>=0.3.12", "matplotlib>=3.10.3"]
+requires-python = ">=3.10"
+dependencies = [
+    "furhat-remote-api>=1.0.2",
+    "kagglehub>=0.3.12",
+    "matplotlib>=3.10.3",
+    "opencv-python>=4.11.0.86",
+    "pyrealsense2>=2.55.1.6486",
+]
 
 [dependency-groups]
 dev = ["ipykernel>=6.29.5"]
