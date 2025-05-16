@@ -29,6 +29,14 @@ class FurhatController:
         )
         self.worker_thread.start()
 
+        # Traduction des émotions pour une meilleure verbalisation
+        self.emotion_names = {
+            "angry": "la colère",
+            "fear": "la peur",
+            "happy": "la joie",
+            "sad": "la tristesse",
+        }
+
         # Messages par émotion
         self.messages = {
             "angry": [
@@ -161,9 +169,11 @@ class FurhatController:
                 color = self.colors.get(emotion, {"r": 255, "g": 255, "b": 255})
                 self.set_led(color["r"], color["g"], color["b"])
 
-                # Dire une phrase correspondant à l'émotion
-                emotion_display = emotion.capitalize()
-                intro = f"Je détecte que vous ressentez de la {emotion_display}. "
+                # Utiliser la traduction française correcte de l'émotion
+                emotion_fr = self.emotion_names.get(emotion, "une émotion inconnue")
+
+                # Reformuler l'introduction pour éviter les problèmes grammaticaux
+                intro = f"Je vois que vous exprimez {emotion_fr}. "
 
                 messages = self.messages.get(
                     emotion, ["Je ne sais pas comment me sentir."]
