@@ -24,22 +24,10 @@ class FurhatController:
         self.latest_emotion = None
         self.current_emotion = None
         self.emotion_changed = threading.Event()
-        self.last_speech_time = 0  # Timestamp de la dernière fois que le robot a parlé
-        self.min_speech_interval = (
-            5.0  # Intervalle minimum entre deux phrases (5 secondes)
-        )
         self.worker_thread = threading.Thread(
             target=self._process_emotions, daemon=True
         )
         self.worker_thread.start()
-
-        # Traduction des émotions pour une meilleure verbalisation
-        self.emotion_names = {
-            "angry": "la colère",
-            "fear": "la peur",
-            "happy": "la joie",
-            "sad": "la tristesse",
-        }
 
         # Messages par émotion
         self.messages = {
@@ -104,7 +92,7 @@ class FurhatController:
     def set_led(self, r: int, g: int, b: int):
         try:
             # Using query parameters for color values
-            url = f"http://{self.host}:54321/furhat/led"
+            url = f"http://{self.host}/furhat/led"
             params = {"red": r, "green": g, "blue": b}
             response = requests.post(url, params=params)
             response.raise_for_status()
@@ -164,14 +152,8 @@ class FurhatController:
             # Réinitialiser l'événement
             self.emotion_changed.clear()
 
-            # Si le robot n'est pas en train de parler ET si assez de temps s'est écoulé
-            current_time = time.time()
-            time_since_last_speech = current_time - self.last_speech_time
-
-            if (
-                not self.is_speaking()
-                and time_since_last_speech >= self.min_speech_interval
-            ):
+            # Si le robot n'est pas en train de parler
+            if not self.is_speaking():
                 emotion = self.current_emotion
 
                 # Changer expression et LED
@@ -179,11 +161,9 @@ class FurhatController:
                 color = self.colors.get(emotion, {"r": 255, "g": 255, "b": 255})
                 self.set_led(color["r"], color["g"], color["b"])
 
-                # Utiliser la traduction française correcte de l'émotion
-                emotion_fr = self.emotion_names.get(emotion, "une émotion inconnue")
-
-                # Reformuler l'introduction pour éviter les problèmes grammaticaux
-                intro = f"Je vois que vous exprimez {emotion_fr}. "
+                # Dire une phrase correspondant à l'émotion
+                emotion_display = emotion.capitalize()
+                intro = f"Je détecte que vous ressentez de la {emotion_display}. "
 
                 messages = self.messages.get(
                     emotion, ["Je ne sais pas comment me sentir."]
@@ -191,22 +171,12 @@ class FurhatController:
                 message = intro + random.choice(messages)
                 self.say(message)
 
-                # Mettre à jour le timestamp de la dernière parole
-                self.last_speech_time = time.time()
-
                 # Une fois que le robot a fini de parler, vérifier s'il y a une nouvelle émotion
-                # qui est différente de celle qui vient d'être traitée
                 if self.latest_emotion != self.current_emotion:
                     self.current_emotion = self.latest_emotion
                     self.emotion_changed.set()
 
-            # Si pas assez de temps écoulé, attendre un peu avant de vérifier à nouveau
-            elif time_since_last_speech < self.min_speech_interval:
-                # Attendre jusqu'à ce que le délai minimum soit atteint
-                time.sleep(0.5)  # Vérifier toutes les 500ms
-
-            else:
-                time.sleep(0.1)  # Éviter de surcharger le CPU
+            time.sleep(0.1)  # Éviter de surcharger le CPU
 
 
 # === Le reste du code reste inchangé ===
