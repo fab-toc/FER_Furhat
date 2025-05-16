@@ -100,7 +100,7 @@ class FurhatController:
     def set_led(self, r: int, g: int, b: int):
         try:
             # Using query parameters for color values
-            url = f"http://{self.host}/furhat/led"
+            url = f"http://{self.host}:54321/furhat/led"
             params = {"red": r, "green": g, "blue": b}
             response = requests.post(url, params=params)
             response.raise_for_status()
