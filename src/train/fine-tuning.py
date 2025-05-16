@@ -14,7 +14,6 @@ from utils import (
     train_classifier_with_validation,
 )
 
-# # Set up the script
 # args = parse_args()
 
 # Set the random seed for reproducibility
@@ -157,7 +156,7 @@ model = get_model(
     model_name=model_name,
     model_version=model_version,
     num_classes=len(CLASSES),
-    unfreeze_feature_layer_start=unfreeze_feature_layer_start,
+    unfreeze_layer_start=unfreeze_feature_layer_start,
 )
 
 model.load_state_dict(
@@ -166,7 +165,7 @@ model.load_state_dict(
             os.path.dirname(data_dir),
             "trained",
             model_name,
-            f"{model_name}_{model_version}_b{256}_l{unfreeze_feature_layer_start}:end_e{num_epochs}.pt",
+            f"{model_name}_{model_version}_b{256}_l{unfreeze_feature_layer_start}_end_e{num_epochs}.pt",
         )
     )
 )

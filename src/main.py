@@ -1,19 +1,195 @@
-import pyrealsense2 as rs
-import numpy as np
-import cv2
-import time
 import os
-from typing import Literal
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
-from torch.utils.data import Dataset, DataLoader
-import copy
-from PIL import Image
+import random
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
+
+import cv2
+import numpy as np
+import pyrealsense2 as rs
+import requests
+import torch
+from furhat_remote_api import FurhatRemoteAPI
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
 
 from train.utils import get_data_transforms, get_model
 
+
+class FurhatController:
+    def __init__(self, host="192.168.10.14"):
+        self.host = host
+        self.furhat = FurhatRemoteAPI(host=host)
+        self.speaking = False
+        self.latest_emotion = None
+        self.current_emotion = None
+        self.emotion_changed = threading.Event()
+        self.worker_thread = threading.Thread(
+            target=self._process_emotions, daemon=True
+        )
+        self.worker_thread.start()
+
+        # Traduction des émotions pour une meilleure verbalisation
+        self.emotion_names = {
+            "angry": "la colère",
+            "fear": "la peur",
+            "happy": "la joie",
+            "sad": "la tristesse",
+        }
+
+        # Messages par émotion
+        self.messages = {
+            "angry": [
+                "Je ressens de la colère. C'est une émotion forte.",
+                "La colère peut être difficile à gérer parfois.",
+                "Quand on est en colère, il faut essayer de respirer profondément.",
+                "La colère est parfois justifiée, mais il faut savoir la canaliser.",
+            ],
+            "fear": [
+                "J'ai peur. C'est une émotion qui nous protège du danger.",
+                "La peur peut parfois nous paralyser.",
+                "Respirer calmement peut aider à surmonter la peur.",
+                "La peur est naturelle, elle fait partie de nous.",
+            ],
+            "happy": [
+                "Je suis heureux! C'est agréable de ressentir de la joie.",
+                "Le bonheur est un état merveilleux à partager.",
+                "Sourire est contagieux, essayez de sourire à quelqu'un aujourd'hui!",
+                "La joie illumine notre journée et celle des autres.",
+            ],
+            "sad": [
+                "Je me sens triste. C'est normal d'être triste parfois.",
+                "La tristesse fait partie de la vie, comme la joie.",
+                "Exprimer sa tristesse peut aider à se sentir mieux.",
+                "Après la pluie vient le beau temps, la tristesse ne dure pas éternellement.",
+            ],
+        }
+
+        # Couleurs LED par émotion (format RGB)
+        self.colors = {
+            "angry": {"r": 255, "g": 0, "b": 0},  # Rouge
+            "fear": {"r": 128, "g": 0, "b": 128},  # Violet
+            "happy": {"r": 255, "g": 255, "b": 0},  # Jaune
+            "sad": {"r": 0, "g": 0, "b": 255},  # Bleu
+        }
+
+        self.expressions = {
+            "angry": "ExpressAnger",
+            "fear": "ExpressFear",
+            "happy": "BigSmile",
+            "sad": "ExpressSad",
+        }
+
+        try:
+            self.furhat.get_voices()
+            print("✅ Connexion réussie au robot Furhat")
+
+            self.set_voice("Margaux", "French")
+        except Exception as e:
+            print(f"❌ Erreur lors de la connexion au robot Furhat: {e}")
+
+    def set_voice(self, voice_name: str, language: str = "French"):
+        try:
+            # Utiliser l'API Python pour configurer la voix
+            self.furhat.set_voice(name=voice_name, language=language)
+            return True
+        except Exception as e:
+            print(f"Erreur lors de la configuration de la voix: {e}")
+            return False
+
+    def set_led(self, r: int, g: int, b: int):
+        try:
+            # Using query parameters for color values
+            url = f"http://{self.host}:54321/furhat/led"
+            params = {"red": r, "green": g, "blue": b}
+            response = requests.post(url, params=params)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            print(f"Erreur lors du changement de la LED: {e}")
+            return False
+
+    def set_face(self, expression: str):
+        try:
+            # Utiliser l'API Python pour changer l'expression
+            self.furhat.gesture(name=expression)
+            return True
+        except Exception as e:
+            print(f"Erreur lors du changement d'expression: {e}")
+            return False
+
+    def say(self, text: str):
+        self.speaking = True
+        try:
+            # Utiliser l'API Python pour faire parler Furhat
+            self.furhat.say(text=text, blocking=True)
+            self.speaking = False
+            return True
+        except Exception as e:
+            print(f"Erreur lors de la parole: {e}")
+            self.speaking = False
+            return False
+
+    def is_speaking(self):
+        try:
+            # L'API ne fournit pas directement de méthode pour vérifier si le robot parle
+            # On s'appuie donc sur notre variable interne
+            return self.speaking
+        except Exception as e:
+            print(f"Erreur lors de la vérification du statut: {e}")
+            return self.speaking  # Fallback sur l'état interne
+
+    def handle_emotion(self, emotion):
+        """Met à jour l'émotion détectée seulement si le robot ne parle pas"""
+        emotion_lower = emotion.lower()
+
+        # Stocke toujours la dernière émotion détectée
+        self.latest_emotion = emotion_lower
+
+        # Si le robot ne parle pas et que c'est une nouvelle émotion
+        if not self.is_speaking() and emotion_lower != self.current_emotion:
+            self.current_emotion = emotion_lower
+            self.emotion_changed.set()
+
+    def _process_emotions(self):
+        """Thread qui traite les émotions seulement quand le robot ne parle pas"""
+        while True:
+            # Attendre qu'une nouvelle émotion soit détectée
+            self.emotion_changed.wait()
+
+            # Réinitialiser l'événement
+            self.emotion_changed.clear()
+
+            # Si le robot n'est pas en train de parler
+            if not self.is_speaking():
+                emotion = self.current_emotion
+
+                # Changer expression et LED
+                self.set_face(self.expressions.get(emotion, "Neutral"))
+                color = self.colors.get(emotion, {"r": 255, "g": 255, "b": 255})
+                self.set_led(color["r"], color["g"], color["b"])
+
+                # Utiliser la traduction française correcte de l'émotion
+                emotion_fr = self.emotion_names.get(emotion, "une émotion inconnue")
+
+                # Reformuler l'introduction pour éviter les problèmes grammaticaux
+                intro = f"Je vois que vous exprimez {emotion_fr}. "
+
+                messages = self.messages.get(
+                    emotion, ["Je ne sais pas comment me sentir."]
+                )
+                message = intro + random.choice(messages)
+                self.say(message)
+
+                # Une fois que le robot a fini de parler, vérifier s'il y a une nouvelle émotion
+                if self.latest_emotion != self.current_emotion:
+                    self.current_emotion = self.latest_emotion
+                    self.emotion_changed.set()
+
+            time.sleep(0.1)  # Éviter de surcharger le CPU
+
+
+# === Le reste du code reste inchangé ===
 # === Dataset en mémoire ===
 class InMemoryFaceDataset(Dataset):
     def __init__(self, image_list, transform=None, label=0):
@@ -47,21 +223,24 @@ pipeline.start(cfg)
 
 cv2.namedWindow("Visages détectés", cv2.WINDOW_NORMAL)
 
+
 # === Hyperparams & modèle ===
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
 
 NUM_IMAGES = 60
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 NUM_WORKERS = 4
 PREFETCH = 2
 
 MODEL_NAME = "convnext"
-MODEL_VER = "tiny"
-UNFREEZE_LAYER = 2
+MODEL_VER = "large"
+UNFREEZE_LAYER = 3
 MODEL_PATH = os.path.join(
-    os.path.dirname(__file__),
-    f"../trained/{MODEL_NAME}_{MODEL_VER}_b512_l{UNFREEZE_LAYER}_end_e20.pt"
+    os.path.dirname(os.path.dirname(__file__)),
+    "trained",
+    MODEL_NAME,
+    f"fine-tuned_{MODEL_NAME}_{MODEL_VER}_b{BATCH_SIZE}_l{UNFREEZE_LAYER}_end_e20.pt",
 )
 
 transforms_pipeline = get_data_transforms(
@@ -78,15 +257,16 @@ base_model = get_model(
     model_name=MODEL_NAME,
     model_version=MODEL_VER,
     num_classes=4,
-    unfreeze_feature_layer_start=UNFREEZE_LAYER,
+    unfreeze_layer_start=UNFREEZE_LAYER,
 )
 base_model.load_state_dict(torch.load(MODEL_PATH))
 base_model.eval()
 base_model.to(device, non_blocking=True)
 
-# ThreadPool pour l’inférence
+# ThreadPool pour l'inférence
 executor = ThreadPoolExecutor(max_workers=1)
 last_prediction = "En attente..."
+
 
 def inference_task(image_batch):
     """Tâche d'inférence, tourne en thread séparé."""
@@ -110,12 +290,20 @@ def inference_task(image_batch):
 
     counts = {"Angry": 0, "Fear": 0, "Happy": 0, "Sad": 0}
     for p in all_preds:
-        if p == 0: counts["Angry"] += 1
-        elif p == 1: counts["Fear"] += 1
-        elif p == 2: counts["Happy"] += 1
-        elif p == 3: counts["Sad"] += 1
+        if p == 0:
+            counts["Angry"] += 1
+        elif p == 1:
+            counts["Fear"] += 1
+        elif p == 2:
+            counts["Happy"] += 1
+        elif p == 3:
+            counts["Sad"] += 1
     dominant = max(counts, key=counts.get)
     return dominant
+
+
+# Créer une instance de FurhatController
+furhat_controller = FurhatController()
 
 # === Boucle principale ===
 collected = []
@@ -135,35 +323,43 @@ try:
         faces = face_cascade.detectMultiScale(gray, 1.1, 5)
 
         # 2) Capture en mémoire
-        if faces is not None and len(collected) < NUM_IMAGES:
-            for (x, y, w, h) in faces:
+        if len(faces) > 0 and len(collected) < NUM_IMAGES:
+            for x, y, w, h in faces:
                 now = time.time()
-                if now - last_capture >= 1/60:
-                    collected.append(img[y:y+h, x:x+w].copy())
+                if now - last_capture >= 1 / 60:
+                    collected.append(img[y : y + h, x : x + w].copy())
                     last_capture = now
-                cv2.rectangle(img, (x, y), (x+w, y+h), (0,255,0), 2)
+                cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
         # 3) Lancer inférence quand batch complet
         if len(collected) >= NUM_IMAGES:
             # Submit sans bloquer la boucle
             future = executor.submit(inference_task, list(collected))
-            future.add_done_callback(lambda f: globals().update(last_prediction=f.result()))
+
+            def handle_emotion_result(future):
+                global last_prediction
+                result = future.result()
+                last_prediction = result
+                # Envoyer l'émotion détectée au contrôleur Furhat
+                furhat_controller.handle_emotion(result.lower())
+
+            future.add_done_callback(handle_emotion_result)
             collected.clear()
 
-        # 4) Affichage prédiction sur l’image
+        # 4) Affichage prédiction sur l'image
         cv2.putText(
             img,
-            f"Emotion: {last_prediction}",          # texte
-            (10, 30),                               # position
-            cv2.FONT_HERSHEY_SIMPLEX,               # police :contentReference[oaicite:2]{index=2}
-            1.0,                                    # échelle
-            (0, 255, 0),                            # couleur BGR :contentReference[oaicite:3]{index=3}
-            2,                                      # épaisseur
-            cv2.LINE_AA
+            f"Emotion: {last_prediction}",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.0,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
         )
 
         cv2.imshow("Visages détectés", img)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
 finally:
