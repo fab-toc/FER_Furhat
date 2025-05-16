@@ -1,5 +1,4 @@
 import os
-import queue
 import random
 import threading
 import time
@@ -22,8 +21,9 @@ class FurhatController:
         self.host = host
         self.furhat = FurhatRemoteAPI(host=host)
         self.speaking = False
-        self.emotion_queue = queue.Queue()
+        self.latest_emotion = None
         self.current_emotion = None
+        self.emotion_changed = threading.Event()
         self.worker_thread = threading.Thread(
             target=self._process_emotions, daemon=True
         )
@@ -92,7 +92,7 @@ class FurhatController:
     def set_led(self, r: int, g: int, b: int):
         try:
             # Using query parameters for color values
-            url = f"http://{self.host}/led"
+            url = f"http://{self.host}/furhat/led"
             params = {"red": r, "green": g, "blue": b}
             response = requests.post(url, params=params)
             response.raise_for_status()
@@ -132,24 +132,36 @@ class FurhatController:
             return self.speaking  # Fallback sur l'état interne
 
     def handle_emotion(self, emotion):
-        if emotion != self.current_emotion:
-            # Récupérer l'émotion en minuscule pour la correspondance avec les clés
-            emotion_lower = emotion.lower()
-            self.emotion_queue.put(emotion_lower)
+        """Met à jour l'émotion détectée seulement si le robot ne parle pas"""
+        emotion_lower = emotion.lower()
+
+        # Stocke toujours la dernière émotion détectée
+        self.latest_emotion = emotion_lower
+
+        # Si le robot ne parle pas et que c'est une nouvelle émotion
+        if not self.is_speaking() and emotion_lower != self.current_emotion:
+            self.current_emotion = emotion_lower
+            self.emotion_changed.set()
 
     def _process_emotions(self):
+        """Thread qui traite les émotions seulement quand le robot ne parle pas"""
         while True:
-            if not self.emotion_queue.empty() and not self.is_speaking():
-                emotion = self.emotion_queue.get()
-                self.current_emotion = emotion
+            # Attendre qu'une nouvelle émotion soit détectée
+            self.emotion_changed.wait()
+
+            # Réinitialiser l'événement
+            self.emotion_changed.clear()
+
+            # Si le robot n'est pas en train de parler
+            if not self.is_speaking():
+                emotion = self.current_emotion
 
                 # Changer expression et LED
                 self.set_face(self.expressions.get(emotion, "Neutral"))
                 color = self.colors.get(emotion, {"r": 255, "g": 255, "b": 255})
                 self.set_led(color["r"], color["g"], color["b"])
 
-                # Dire une phrase aléatoire correspondant à l'émotion
-                # Et ajouter la mention de l'émotion détectée
+                # Dire une phrase correspondant à l'émotion
                 emotion_display = emotion.capitalize()
                 intro = f"Je détecte que vous ressentez de la {emotion_display}. "
 
@@ -159,9 +171,15 @@ class FurhatController:
                 message = intro + random.choice(messages)
                 self.say(message)
 
-            time.sleep(0.5)  # Vérifier toutes les 500ms
+                # Une fois que le robot a fini de parler, vérifier s'il y a une nouvelle émotion
+                if self.latest_emotion != self.current_emotion:
+                    self.current_emotion = self.latest_emotion
+                    self.emotion_changed.set()
+
+            time.sleep(0.1)  # Éviter de surcharger le CPU
 
 
+# === Le reste du code reste inchangé ===
 # === Dataset en mémoire ===
 class InMemoryFaceDataset(Dataset):
     def __init__(self, image_list, transform=None, label=0):
@@ -235,7 +253,7 @@ base_model.load_state_dict(torch.load(MODEL_PATH))
 base_model.eval()
 base_model.to(device, non_blocking=True)
 
-# ThreadPool pour l’inférence
+# ThreadPool pour l'inférence
 executor = ThreadPoolExecutor(max_workers=1)
 last_prediction = "En attente..."
 
