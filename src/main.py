@@ -10,6 +10,7 @@ import numpy as np
 import pyrealsense2 as rs
 import requests
 import torch
+from furhat_remote_api import FurhatRemoteAPI
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 
@@ -17,8 +18,9 @@ from train.utils import get_data_transforms, get_model
 
 
 class FurhatController:
-    def __init__(self, host="192.168.10.14", port=54321):
-        self.base_url = f"http://{host}:{port}"
+    def __init__(self, host="192.168.10.14"):
+        self.host = host
+        self.furhat = FurhatRemoteAPI(host=host)
         self.speaking = False
         self.emotion_queue = queue.Queue()
         self.current_emotion = None
@@ -64,91 +66,78 @@ class FurhatController:
         }
 
         self.expressions = {
-            "angry": "Angry",
-            "fear": "Afraid",
-            "happy": "Happy",
-            "sad": "Sad",
+            "angry": "ExpressAnger",
+            "fear": "ExpressFear",
+            "happy": "BigSmile",
+            "sad": "ExpressSad",
         }
 
         try:
-            res = requests.get(f"{self.base_url}/furhat")
+            self.furhat.get_voices()
             print("✅ Connexion réussie au robot Furhat")
 
             self.set_voice("Margaux", "French")
-        except requests.exceptions.RequestException as e:
-            print(f"Erreur lors de la connexion au robot Furhat: {e}")
+        except Exception as e:
+            print(f"❌ Erreur lors de la connexion au robot Furhat: {e}")
 
-    def set_voice(self, voice_name, language="French"):
-        """Configure la voix du robot."""
-        url = f"{self.base_url}/voice"
-        data = {"name": voice_name, "language": language}
+    def set_voice(self, voice_name: str, language: str = "French"):
         try:
-            response = requests.put(url, json=data)
-            response.raise_for_status()
+            # Utiliser l'API Python pour configurer la voix
+            self.furhat.set_voice(name=voice_name, language=language)
             return True
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Erreur lors de la configuration de la voix: {e}")
             return False
 
-    def set_led(self, r, g, b):
-        """Change la couleur de la LED."""
-        url = f"{self.base_url}/led"
-        data = {"red": r, "green": g, "blue": b}
+    def set_led(self, r: int, g: int, b: int):
         try:
-            response = requests.put(url, json=data)
+            # Using query parameters for color values
+            url = f"http://{self.host}/led"
+            params = {"red": r, "green": g, "blue": b}
+            response = requests.post(url, params=params)
             response.raise_for_status()
             return True
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Erreur lors du changement de la LED: {e}")
             return False
 
-    def set_face(self, expression):
-        """Change l'expression faciale du robot."""
-        url = f"{self.base_url}/faces"
-        data = {"name": expression}
+    def set_face(self, expression: str):
         try:
-            response = requests.put(url, json=data)
-            response.raise_for_status()
+            # Utiliser l'API Python pour changer l'expression
+            self.furhat.gesture(name=expression)
             return True
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Erreur lors du changement d'expression: {e}")
             return False
 
-    def say(self, text):
-        """Fait parler le robot et gère l'état 'speaking'."""
-        url = f"{self.base_url}/say"
-        data = {"text": text, "blocking": True}
-
+    def say(self, text: str):
         self.speaking = True
         try:
-            response = requests.post(url, json=data)
-            response.raise_for_status()
+            # Utiliser l'API Python pour faire parler Furhat
+            self.furhat.say(text=text, blocking=True)
             self.speaking = False
             return True
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Erreur lors de la parole: {e}")
             self.speaking = False
             return False
 
     def is_speaking(self):
-        """Vérifie si le robot est en train de parler."""
-        url = f"{self.base_url}/status"
         try:
-            response = requests.get(url)
-            response.raise_for_status()
-            status = response.json()
-            return status.get("speaking", False)
-        except requests.exceptions.RequestException as e:
+            # L'API ne fournit pas directement de méthode pour vérifier si le robot parle
+            # On s'appuie donc sur notre variable interne
+            return self.speaking
+        except Exception as e:
             print(f"Erreur lors de la vérification du statut: {e}")
             return self.speaking  # Fallback sur l'état interne
 
     def handle_emotion(self, emotion):
-        """Ajoute une émotion à la file d'attente pour traitement."""
         if emotion != self.current_emotion:
-            self.emotion_queue.put(emotion)
+            # Récupérer l'émotion en minuscule pour la correspondance avec les clés
+            emotion_lower = emotion.lower()
+            self.emotion_queue.put(emotion_lower)
 
     def _process_emotions(self):
-        """Thread worker qui traite les émotions en file d'attente."""
         while True:
             if not self.emotion_queue.empty() and not self.is_speaking():
                 emotion = self.emotion_queue.get()
@@ -160,10 +149,14 @@ class FurhatController:
                 self.set_led(color["r"], color["g"], color["b"])
 
                 # Dire une phrase aléatoire correspondant à l'émotion
+                # Et ajouter la mention de l'émotion détectée
+                emotion_display = emotion.capitalize()
+                intro = f"Je détecte que vous ressentez de la {emotion_display}. "
+
                 messages = self.messages.get(
                     emotion, ["Je ne sais pas comment me sentir."]
                 )
-                message = random.choice(messages)
+                message = intro + random.choice(messages)
                 self.say(message)
 
             time.sleep(0.5)  # Vérifier toutes les 500ms
@@ -281,6 +274,9 @@ def inference_task(image_batch):
     return dominant
 
 
+# Créer une instance de FurhatController
+furhat_controller = FurhatController()
+
 # === Boucle principale ===
 collected = []
 last_capture = time.time()
@@ -299,7 +295,7 @@ try:
         faces = face_cascade.detectMultiScale(gray, 1.1, 5)
 
         # 2) Capture en mémoire
-        if faces is not None and len(collected) < NUM_IMAGES:
+        if len(faces) > 0 and len(collected) < NUM_IMAGES:
             for x, y, w, h in faces:
                 now = time.time()
                 if now - last_capture >= 1 / 60:
@@ -311,20 +307,26 @@ try:
         if len(collected) >= NUM_IMAGES:
             # Submit sans bloquer la boucle
             future = executor.submit(inference_task, list(collected))
-            future.add_done_callback(
-                lambda f: globals().update(last_prediction=f.result())
-            )
+
+            def handle_emotion_result(future):
+                global last_prediction
+                result = future.result()
+                last_prediction = result
+                # Envoyer l'émotion détectée au contrôleur Furhat
+                furhat_controller.handle_emotion(result.lower())
+
+            future.add_done_callback(handle_emotion_result)
             collected.clear()
 
-        # 4) Affichage prédiction sur l’image
+        # 4) Affichage prédiction sur l'image
         cv2.putText(
             img,
-            f"Emotion: {last_prediction}",  # texte
-            (10, 30),  # position
-            cv2.FONT_HERSHEY_SIMPLEX,  # police :contentReference[oaicite:2]{index=2}
-            1.0,  # échelle
-            (0, 255, 0),  # couleur BGR :contentReference[oaicite:3]{index=3}
-            2,  # épaisseur
+            f"Emotion: {last_prediction}",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.0,
+            (0, 255, 0),
+            2,
             cv2.LINE_AA,
         )
 
