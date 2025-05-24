@@ -8,7 +8,7 @@ Ce projet vise à implémenter un algorithme de reconnaissance de certaines expr
 
 ## Installer uv
 
-### Pour macOS and Linux :
+### Pour macOS et Linux :
 
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -32,12 +32,6 @@ Sous Linux, exécutez la commande suivante et notez la version de CUDA affichée
 nvidia-smi
 ```
 
-#### Pour CUDA 11.8
-
-```
-uv sync --extra cu118
-```
-
 #### Pour CUDA 12.4
 
 ```
@@ -54,22 +48,6 @@ uv sync --extra cu126
 
 ```
 uv sync --extra cu128
-```
-
-### Si vous avez une carte graphique AMD
-
-(uniquement compatible sous Linux, limitation de PyTorch)
-
-```
-uv sync --extra rocm
-```
-
-### Si vous avez une carte graphique INTEL
-
-(uniquement compatible sous Linux et Windows, limitation de PyTorch)
-
-```
-uv sync --extra xpu
 ```
 
 ### Si vous n'avez pas de carte graphique
