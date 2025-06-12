@@ -37,8 +37,9 @@ Ce projet implémente un **système de reconnaissance d'expressions faciales en 
 ### 🎭 Expressions Reconnues
 
 Le système peut détecter et réagir à **4 expressions principales** :
+
 - 😠 **Colère** (Angry) - LED rouge, expression de colère
-- 😨 **Peur** (Fear) - LED violette, expression de peur  
+- 😨 **Peur** (Fear) - LED violette, expression de peur
 - 😊 **Joie** (Happy) - LED jaune, grand sourire
 - 😢 **Tristesse** (Sad) - LED bleue, expression triste
 
@@ -70,6 +71,7 @@ graph LR
 ```
 
 **Pipeline de traitement :**
+
 1. **Capture** : Images en temps réel via RealSense
 2. **Détection** : Localisation des visages avec Haar Cascades
 3. **Traitement** : Redimensionnement et augmentation des données
@@ -92,11 +94,13 @@ graph LR
 uv est un gestionnaire de paquets Python ultra-rapide qui gère automatiquement les environnements virtuels.
 
 #### 🐧 Linux / 🍎 macOS
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 #### 🪟 Windows
+
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
@@ -115,6 +119,7 @@ Le choix des dépendances PyTorch dépend de votre configuration matérielle :
 #### 🔥 Avec GPU NVIDIA
 
 Identifiez d'abord votre version CUDA :
+
 ```bash
 nvidia-smi
 ```
@@ -125,7 +130,7 @@ Puis installez selon votre version :
 # CUDA 11.8
 uv sync --extra cu118
 
-# CUDA 12.4  
+# CUDA 12.4
 uv sync --extra cu124
 
 # CUDA 12.6
@@ -161,6 +166,7 @@ nano .env
 ```
 
 Ajoutez vos identifiants Kaggle :
+
 ```bash
 export KAGGLE_USERNAME=votre_username
 export KAGGLE_KEY=votre_api_key
@@ -224,11 +230,13 @@ TPE_FER_Furhat/
 ### 🧩 Composants Principaux
 
 #### `src/main.py` - Application Principale
+
 - **FurhatController** : Gestion robot (voix, expressions, LEDs)
 - **InMemoryFaceDataset** : Dataset optimisé pour l'inférence
 - **Pipeline temps réel** : Capture → Traitement → Inférence → Réaction
 
 #### `src/train/utils.py` - Utilitaires ML
+
 - [`get_model()`](src/train/utils.py) : Factory de modèles (VGG/ConvNeXt)
 - [`get_data_transforms()`](src/train/utils.py) : Pipeline de preprocessing
 - [`train_classifier_with_validation()`](src/train/utils.py) : Boucle d'entraînement
@@ -240,10 +248,10 @@ TPE_FER_Furhat/
 
 ### 🏗️ Architectures
 
-| Modèle | Variantes | Paramètres | Performance |
-|--------|-----------|------------|-------------|
-| **ConvNeXt** | Tiny, Small, Base, Large | 28M - 197M | ⭐⭐⭐⭐⭐ |
-| **VGG** | VGG11, VGG13, VGG16, VGG19 | 132M - 143M | ⭐⭐⭐⭐ |
+| Modèle       | Variantes                  | Paramètres  | Performance |
+| ------------ | -------------------------- | ----------- | ----------- |
+| **ConvNeXt** | Tiny, Small, Base, Large   | 28M - 197M  | ⭐⭐⭐⭐⭐  |
+| **VGG**      | VGG11, VGG13, VGG16, VGG19 | 132M - 143M | ⭐⭐⭐⭐    |
 
 ### ⚙️ Configuration Recommandée
 
@@ -261,12 +269,14 @@ BATCH_SIZE = 32               # Équilibre vitesse/mémoire
 [Furhat Robotics](https://www.furhatrobotics.com/) développe des robots sociaux avec des capacités d'interaction naturelle. Notre système utilise :
 
 ### 🎭 Capacités Furhat Utilisées
+
 - **Expressions faciales** : 20+ expressions programmables
 - **Synthèse vocale** : Voix multilingues (français supporté)
 - **LEDs** : Éclairage RGB personnalisable
 - **API REST** : Contrôle via HTTP/WebSocket
 
 ### 🔧 Configuration Réseau
+
 Par défaut, le système cherche Furhat sur `192.168.10.14:54321`. Modifiez dans `main.py` :
 
 ```python
@@ -318,61 +328,7 @@ self.colors = {
 
 ### 🎯 Métriques Typiques
 
-| Dataset | Modèle | Précision | Temps Inférence |
-|---------|--------|-----------|-----------------|
-| FER2013 | ConvNeXt-Large | ~85% | ~50ms |
-| Custom | ConvNeXt-Large | ~90% | ~50ms |
-| FER2013 | VGG16 | ~80% | ~30ms |
-
-### ⚡ Optimisations
-
-- **Traitement asynchrone** : Inférence en arrière-plan
-- **Batch processing** : 60 images par lot
-- **GPU optimisé** : CUDA, mixed precision
-- **Cache intelligent** : Évite les réactions répétitives
-
----
-
-## 🤝 Contribution
-
-### 🐛 Signaler un Bug
-Ouvrez une [issue](https://github.com/votre-username/TPE_FER_Furhat/issues) avec :
-- Description du problème
-- Étapes de reproduction  
-- Configuration système
-- Logs d'erreur
-
-### 💡 Proposer une Fonctionnalité
-1. **Fork** le projet
-2. **Créer** une branche feature (`git checkout -b feature/AmazingFeature`)
-3. **Commit** vos changements (`git commit -m 'Add some AmazingFeature'`)
-4. **Push** vers la branche (`git push origin feature/AmazingFeature`)
-5. **Ouvrir** une Pull Request
-
-### 🧪 Tests
-```bash
-# Lancer les tests
-uv run pytest
-
-# Test de style de code
-uv run flake8 src/
-```
-
----
-
-<div align="center">
-
-### 🎉 Prêt à Démarrer ?
-
-```bash
-git clone https://github.com/votre-username/TPE_FER_Furhat.git
-cd TPE_FER_Furhat
-uv sync --extra cu118  # ou votre config GPU
-uv run src/main.py
-```
-
-**Fait avec ❤️ pour l'interaction humain-robot**
-
-[⬆️ Retour en haut](#tpe-issd---reconnaissance-dexpressions-faciales-avec-robot-furhat)
-
-</div>
+| Dataset                     | Modèle         | Précision |
+| --------------------------- | -------------- | --------- |
+| FER2013                     | ConvNeXt-Large | ~60%      |
+| Fine-tuné sur notre dataset | ConvNeXt-Large | ~90%      |
