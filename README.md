@@ -1,18 +1,15 @@
-# TPE ISSD - Reconnaissance d'Expressions Faciales avec Robot Furhat
+# TPE ISSD - Reconnaissance d'Expressions Faciales avec un Robot Furhat
 
 <div align="center">
 
-![Python](https://img.shields.io/badge/python-v3.10+-blue.svg)
+![Python](https://img.shields.io/badge/python-v3.10-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-v2.6+-red.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-**Un système de reconnaissance d'expressions faciales en temps réel intégré avec le robot humanoïde Furhat**
+**Système de reconnaissance d'expressions faciales en temps réel intégré avec le robot humanoïde <a href="https://furhatrobotics.com/">Furhat</a>**
 
 [🚀 Installation](#installation) • [📖 Documentation](#documentation) • [🎯 Utilisation](#utilisation) • [🤖 À propos de Furhat](#à-propos-de-furhat)
 
 </div>
-
----
 
 ## 📋 Table des Matières
 
@@ -28,70 +25,49 @@
 - [📈 Performances](#-performances)
 - [🤝 Contribution](#-contribution)
 
----
-
 ## 🎯 Description du Projet
 
-Ce projet implémente un **système de reconnaissance d'expressions faciales en temps réel** utilisant des techniques de deep learning. Le système capture les expressions via une caméra Intel RealSense, les analyse avec un modèle ConvNeXt ou VGG pré-entraîné, puis fait réagir le robot humanoïde **[Furhat](https://www.furhatrobotics.com/)** en conséquence.
+Ce projet implémente un **système de reconnaissance d'expressions faciales en temps réel** en utilisant des techniques de deep learning. Le système capture les visages via une caméra puis les analyse avec un modèle de classification d'images classique (modèles entraînés sur le dataset ImageNet en général), fine-tuné une première fois sur le dataset d'expressions faciales FER2013. puis fait réagir le robot humanoïde **[Furhat](https://furhatrobotics.com/)** en conséquence.
 
 ### 🎭 Expressions Reconnues
 
-Le système peut détecter et réagir à **4 expressions principales** :
+Le système peut détecter **4 expressions principales** et les associer à des réactions spécifiques du robot Furhat :
 
 - 😠 **Colère** (Angry) - LED rouge, expression de colère
 - 😨 **Peur** (Fear) - LED violette, expression de peur
 - 😊 **Joie** (Happy) - LED jaune, grand sourire
 - 😢 **Tristesse** (Sad) - LED bleue, expression triste
 
----
-
 ## ✨ Fonctionnalités
 
-- 🎥 **Capture en temps réel** avec caméra Intel RealSense
+- 🎥 **Capture en temps réel** avec caméra RealSense
 - 🧠 **Deep Learning** avec modèles ConvNeXt/VGG pré-entraînés
 - 🤖 **Intégration Furhat** complète (voix, expressions, LEDs)
 - 🎯 **Détection de visages** avec OpenCV
-- ⚡ **Traitement asynchrone** pour performances optimales
 - 🎨 **Interface visuelle** avec affichage en temps réel
 - 🔧 **Configuration flexible** des hyperparamètres
 - 📊 **Fine-tuning** sur données personnalisées
 
----
-
 ## 🏗️ Architecture
-
-```mermaid
-graph LR
-    A[Caméra RealSense] --> B[Détection Visages]
-    B --> C[Preprocessing]
-    C --> D[Modèle ConvNeXt/VGG]
-    D --> E[Classification Émotions]
-    E --> F[Contrôleur Furhat]
-    F --> G[Expression + Voix + LED]
-```
 
 **Pipeline de traitement :**
 
 1. **Capture** : Images en temps réel via RealSense
-2. **Détection** : Localisation des visages avec Haar Cascades
+2. **Détection** : Localisation des visages avec OpenCV
 3. **Traitement** : Redimensionnement et augmentation des données
 4. **Inférence** : Classification avec modèle pré-entraîné
 5. **Réaction** : Synchronisation Furhat (expression, voix, LEDs)
-
----
 
 ## 🚀 Installation
 
 ### Prérequis
 
-- 🐍 **Python 3.10+**
-- 🎥 **Caméra Intel RealSense** (D415, D435, etc.)
+- 🎥 **Caméra quelconque** (D415, D435, etc.) / **Caméra RealSense** (_si vous souhaitez utiliser le projet directement_)
 - 🤖 **Robot Furhat** avec connexion réseau
-- 💻 **Système compatible** : Linux, Windows, macOS
 
 ### 1. Installer uv (Gestionnaire de dépendances)
 
-uv est un gestionnaire de paquets Python ultra-rapide qui gère automatiquement les environnements virtuels.
+Pour gérer les dépendances, ce projet utilise uv, un gestionnaire de paquets Python bien plus rapide que pip qui gère automatiquement les environnements virtuels.
 
 #### 🐧 Linux / 🍎 macOS
 
@@ -108,8 +84,8 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ### 2. Cloner le Projet
 
 ```bash
-git clone https://github.com/votre-username/TPE_FER_Furhat.git
-cd TPE_FER_Furhat
+git clone https://github.com/fab-toc/FER_Furhat.git
+cd FER_Furhat
 ```
 
 ### 3. Installer les Dépendances
@@ -145,12 +121,6 @@ uv sync --extra cu128
 ```bash
 # CPU uniquement
 uv sync --extra cpu
-
-# GPU AMD (Linux uniquement)
-uv sync --extra rocm
-
-# GPU Intel (Linux/Windows)
-uv sync --extra xpu
 ```
 
 ### 4. Configuration Kaggle (Optionnel)
@@ -171,8 +141,6 @@ Ajoutez vos identifiants Kaggle :
 export KAGGLE_USERNAME=votre_username
 export KAGGLE_KEY=votre_api_key
 ```
-
----
 
 ## 🎮 Utilisation
 
@@ -206,12 +174,10 @@ uv run src/test.py
 uv run src/test_furhat.py
 ```
 
----
-
 ## 📊 Structure du Projet
 
 ```
-TPE_FER_Furhat/
+FER_Furhat/
 ├── 📁 src/                     # Code source principal
 │   ├── 🐍 main.py             # Application principale
 │   ├── 🧪 test.py             # Tests de modèles
@@ -219,7 +185,7 @@ TPE_FER_Furhat/
 │   └── 📁 train/              # Scripts d'entraînement
 │       ├── 🔧 utils.py        # Utilitaires ML
 │       ├── 🎯 train.py        # Entraînement initial
-│       └── ⚡ fine-tuning.py  # Fine-tuning
+│       └── ⚡ fine-tuning.py   # Fine-tuning
 ├── 📁 trained/                # Modèles sauvegardés (auto-généré)
 ├── 📁 dataset/                # Dataset local (auto-téléchargé)
 ├── ⚙️ pyproject.toml          # Configuration projet
@@ -238,11 +204,9 @@ TPE_FER_Furhat/
 #### `src/train/utils.py` - Utilitaires ML
 
 - [`get_model()`](src/train/utils.py) : Factory de modèles (VGG/ConvNeXt)
-- [`get_data_transforms()`](src/train/utils.py) : Pipeline de preprocessing
-- [`train_classifier_with_validation()`](src/train/utils.py) : Boucle d'entraînement
-- [`eval_classifier()`](src/train/utils.py) : Évaluation de performance
-
----
+- [`get_data_transforms()`](src/train/utils.py) : Pipeline de preprocessing personnalisé
+- [`train_classifier_with_validation()`](src/train/utils.py) : Entraînement d'un modèle de classification avec jeu de données de validation (pour éviter l'overfitting)
+- [`eval_classifier()`](src/train/utils.py) : Évaluation des performances d'un modèle
 
 ## 🧠 Modèles Supportés
 
@@ -262,11 +226,9 @@ UNFREEZE_LAYER = 3            # Fine-tuning optimal
 BATCH_SIZE = 32               # Équilibre vitesse/mémoire
 ```
 
----
-
 ## 🤖 À propos de Furhat
 
-[Furhat Robotics](https://www.furhatrobotics.com/) développe des robots sociaux avec des capacités d'interaction naturelle. Notre système utilise :
+[Furhat Robotics](https://furhatrobotics.com/) développe des robots sociaux avec des capacités d'interaction naturelle. Notre système utilise :
 
 ### 🎭 Capacités Furhat Utilisées
 
@@ -282,8 +244,6 @@ Par défaut, le système cherche Furhat sur `192.168.10.14:54321`. Modifiez dans
 ```python
 furhat_controller = FurhatController(host="VOTRE_IP_FURHAT")
 ```
-
----
 
 ## 🔧 Configuration Avancée
 
@@ -321,8 +281,6 @@ self.colors = {
     "angry": {"r": 255, "g": 0, "b": 0}     # Rouge
 }
 ```
-
----
 
 ## 📈 Performances
 

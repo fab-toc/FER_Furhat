@@ -1,7 +1,7 @@
 [project]
-name = "tpe_issd"
-version = "0.1.0"
-description = "Facial expression recognition using deep learning"
+name = "FER_Furhat"
+version = "1.0"
+description = "Un système de reconnaissance d'expressions faciales en temps réel intégré avec le robot humanoïde Furhat"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

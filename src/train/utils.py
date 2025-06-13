@@ -113,7 +113,9 @@ def get_model(
             in_features = 4096
 
         else:
-            raise ValueError(f"Unsupported VGG version: {model_version}")
+            raise ValueError(
+                f"Unsupported VGG version: {model_version}. Valid options are: 11, 13, 16, 19"
+            )
 
     # ConvNeXt models
     elif model_name.lower() == "convnext":
@@ -138,10 +140,14 @@ def get_model(
             in_features = 1536
 
         else:
-            raise ValueError(f"Unsupported ConvNeXt version: {model_version}")
+            raise ValueError(
+                f"Unsupported ConvNeXt version: {model_version}. Valid options are: tiny, small, base, large"
+            )
 
     else:
-        raise ValueError(f"Unsupported model name: {model_name}")
+        raise ValueError(
+            f"Unsupported model name: {model_name}. Valid options are: vgg, convnext"
+        )
 
     # Freeze all the convolutional layers of the model
     for param in model.features.parameters():
@@ -222,24 +228,28 @@ def get_data_transforms(
 ) -> transforms.Compose:
     transform_list = []
 
-    if input_format == "grayscale":
-        transform_list.append(transforms.Grayscale(num_output_channels=target_channels))
+    match input_format:
+        case "grayscale":
+            transform_list.append(
+                transforms.Grayscale(num_output_channels=target_channels)
+            )
 
-    elif input_format == "rgb":
-        if target_channels == 1:
-            transform_list.append(transforms.Grayscale(num_output_channels=1))
-        else:
-            pass  # Custom handling would go here
+        case "rgb":
+            if target_channels == 1:
+                transform_list.append(transforms.Grayscale(num_output_channels=1))
+            else:
+                pass  # Custom handling would go here
 
-    elif input_format == "rgba":
-        if target_channels == 1:
-            transform_list.append(transforms.Grayscale(num_output_channels=1))
+        case "rgba":
+            if target_channels == 1:
+                transform_list.append(transforms.Grayscale(num_output_channels=1))
+            else:
+                pass  # Custom handling would go here
 
-        else:
-            pass  # Custom handling would go here
-
-    else:
-        raise ValueError(f"Unsupported input format: {input_format}")
+        case _:
+            raise ValueError(
+                f"Unsupported input format: {input_format}. Valid options are: grayscale, rgb, rgba"
+            )
 
     # Apply augmentation based on level
     if augmentation_level != "none":
@@ -255,7 +265,7 @@ def get_data_transforms(
 
         else:
             raise ValueError(
-                f"Unsupported data augmentation level: {augmentation_level}"
+                f"Unsupported data augmentation level: {augmentation_level} . Valid options are: none, light, medium, heavy"
             )
 
     # Always resize to target size
