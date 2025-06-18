@@ -7,15 +7,12 @@
 
 **Système de reconnaissance d'expressions faciales en temps réel intégré avec le robot humanoïde <a href="https://furhatrobotics.com/">Furhat</a>**
 
-[🚀 Installation](#installation) • [📖 Documentation](#documentation) • [🎯 Utilisation](#utilisation) • [🤖 À propos de Furhat](#à-propos-de-furhat)
-
 </div>
 
 ## 📋 Table des Matières
 
 - [🎯 Description du Projet](#-description-du-projet)
-- [✨ Fonctionnalités](#-fonctionnalités)
-- [🏗️ Architecture](#️-architecture)
+- [🏗️ Architecture](#-architecture)
 - [🚀 Installation](#-installation)
 - [🎮 Utilisation](#-utilisation)
 - [📊 Structure du Projet](#-structure-du-projet)
@@ -23,51 +20,43 @@
 - [🤖 À propos de Furhat](#-à-propos-de-furhat)
 - [🔧 Configuration Avancée](#-configuration-avancée)
 - [📈 Performances](#-performances)
-- [🤝 Contribution](#-contribution)
 
 ## 🎯 Description du Projet
 
-Ce projet implémente un **système de reconnaissance d'expressions faciales en temps réel** en utilisant des techniques de deep learning. Le système capture les visages via une caméra puis les analyse avec un modèle de classification d'images classique (modèles entraînés sur le dataset ImageNet en général), fine-tuné une première fois sur le dataset d'expressions faciales FER2013. puis fait réagir le robot humanoïde **[Furhat](https://furhatrobotics.com/)** en conséquence.
+Ce projet vise à implémenter un **système de reconnaissance des expressions faciales en temps réel** en utilisant des méthodes de deep learning. Il capture les visages à l'aide d'une caméra puis les analyse à l'aide d'un modèle de classification d'images.
+
+Le modèle est entraîné sur le jeu de données ImageNet (plusieurs modèles disponibles), fine-tuné une première fois sur le jeu de données d'expressions faciales FER2013 afin de classifier des expressions faciales et non plus des objets, puis fine-tuné une nouvelle fois sur un jeu de données privé, élaboré spécialement pour le projet.
+On fait ensuite réagir le robot humanoïde [Furhat](https://furhatrobotics.com/) en réaction à l'expression détectée, en utilisant notamment des expressions faciales disponibles sur le robot, des LED et de la synthèse vocale.
 
 ### 🎭 Expressions Reconnues
 
-Le système peut détecter **4 expressions principales** et les associer à des réactions spécifiques du robot Furhat :
+Le système peut détecter, à partir du dataset FER2013, **7 expressions faciales différentes**. On choisit ici de se limiter à **4 expressions** afin d'avoir de meilleurs résultats (on exclut la surprise, la peur et l'expression "neutre" qui sont plus difficiles à classifier):
 
 - 😠 **Colère** (Angry) - LED rouge, expression de colère
 - 😨 **Peur** (Fear) - LED violette, expression de peur
 - 😊 **Joie** (Happy) - LED jaune, grand sourire
 - 😢 **Tristesse** (Sad) - LED bleue, expression triste
 
-## ✨ Fonctionnalités
-
-- 🎥 **Capture en temps réel** avec caméra RealSense
-- 🧠 **Deep Learning** avec modèles ConvNeXt/VGG pré-entraînés
-- 🤖 **Intégration Furhat** complète (voix, expressions, LEDs)
-- 🎯 **Détection de visages** avec OpenCV
-- 🎨 **Interface visuelle** avec affichage en temps réel
-- 🔧 **Configuration flexible** des hyperparamètres
-- 📊 **Fine-tuning** sur données personnalisées
-
 ## 🏗️ Architecture
 
 **Pipeline de traitement :**
 
-1. **Capture** : Images en temps réel via RealSense
-2. **Détection** : Localisation des visages avec OpenCV
-3. **Traitement** : Redimensionnement et augmentation des données
-4. **Inférence** : Classification avec modèle pré-entraîné
-5. **Réaction** : Synchronisation Furhat (expression, voix, LEDs)
+1. **Capture** : Capture des images en temps réel via une caméra connectée au PC via USB
+2. **Détection** : Localisation des visages et redimensionnement avec OpenCV
+3. **Traitement** : Augmentation des données (rotation, zoom, etc.) pour améliorer la robustesse de la prédiction
+4. **Inférence** : Classification avec modèle pré-entraîné par batch d'images (permet une prédiction plus robuste par moyennage des prédictions obtenues sur une certaine période de temps)
+5. **Réaction** : Synchronisation au robot Furhat et réaction en fonction de l'expression détectée (expression, voix, LEDs)
 
 ## 🚀 Installation
 
 ### Prérequis
 
-- 🎥 **Caméra quelconque** (D415, D435, etc.) / **Caméra RealSense** (_si vous souhaitez utiliser le projet directement_)
-- 🤖 **Robot Furhat** avec connexion réseau
+- 🎥 **Caméra quelconque** / **Caméra RealSense** (_si vous souhaitez utiliser le projet directement_)
+- 🤖 **Robot Furhat** avec connexion réseau (voir [documentation](https://docs.furhat.io) et configuration pour obtenir son adresse IP) et furhat-remote-api activée sur le robot
 
 ### 1. Installer uv (Gestionnaire de dépendances)
 
-Pour gérer les dépendances, ce projet utilise uv, un gestionnaire de paquets Python bien plus rapide que pip qui gère automatiquement les environnements virtuels.
+Pour gérer les dépendances, ce projet utilise [uv](https://docs.astral.sh/uv), un gestionnaire de paquets Python bien plus rapide que pip qui gère automatiquement les environnements virtuels.
 
 #### 🐧 Linux / 🍎 macOS
 
@@ -125,7 +114,7 @@ uv sync --extra cpu
 
 ### 4. Configuration Kaggle (Optionnel)
 
-Pour télécharger automatiquement le dataset FER2013 :
+Pour télécharger automatiquement le dataset FER2013 (dans le cas où vous souhaitez fine-tuner le modèle et l'entraîner), vous pouvez configurer vos identifiants Kaggle :
 
 ```bash
 # Copier le template
@@ -147,7 +136,7 @@ export KAGGLE_KEY=votre_api_key
 ### 🚀 Démarrage Rapide
 
 1. **Connecter la caméra RealSense**
-2. **S'assurer que Furhat est accessible** sur le réseau
+2. **S'assurer que Furhat est accessible** sur le réseau et bien configuré
 3. **Lancer l'application principale** :
 
 ```bash
@@ -169,44 +158,25 @@ uv run src/train/fine-tuning.py
 ```bash
 # Test sur dataset
 uv run src/test.py
-
-# Test de connexion Furhat
-uv run src/test_furhat.py
 ```
 
 ## 📊 Structure du Projet
 
 ```
 FER_Furhat/
-├── 📁 src/                     # Code source principal
-│   ├── 🐍 main.py             # Application principale
+├── 📁 src/                    # Code source principal
+│   ├── 🐍 main.py             # Application principale (pipeline complet de reconnaissance d'expressions faciales et réactions avec le robot)
 │   ├── 🧪 test.py             # Tests de modèles
-│   ├── 🤖 test_furhat.py      # Test connexion Furhat
 │   └── 📁 train/              # Scripts d'entraînement
-│       ├── 🔧 utils.py        # Utilitaires ML
-│       ├── 🎯 train.py        # Entraînement initial
-│       └── ⚡ fine-tuning.py   # Fine-tuning
-├── 📁 trained/                # Modèles sauvegardés (auto-généré)
-├── 📁 dataset/                # Dataset local (auto-téléchargé)
-├── ⚙️ pyproject.toml          # Configuration projet
-├── 🔒 .env.example            # Template variables environnement
-└── 📖 README.md               # Ce fichier
+│       ├── 🔧 utils.py        # Fonctions utilitaires, d'entraînement, de deep learning, etc.
+│       ├── 🎯 train.py        # Entraînement d'un modèle (fine-tuning sur le dataset FER2013)
+│       └── ⚡ fine-tuning.py   # Fine-tuning sur un dataset privé
+├── 📁 trained/                # Répertoire des modèles entraînés sauvegardés (auto-généré)
+├── 📁 dataset/                # Répertoire d'un potentiel dataset privé (à créer)
+├── ⚙️ pyproject.toml          # Configuration du projet, des dépendances, des scripts, etc.
+├── 🔒 .env.example            # Template variables d'environnement
+└── 📖 README.md               # Cette documentation
 ```
-
-### 🧩 Composants Principaux
-
-#### `src/main.py` - Application Principale
-
-- **FurhatController** : Gestion robot (voix, expressions, LEDs)
-- **InMemoryFaceDataset** : Dataset optimisé pour l'inférence
-- **Pipeline temps réel** : Capture → Traitement → Inférence → Réaction
-
-#### `src/train/utils.py` - Utilitaires ML
-
-- [`get_model()`](src/train/utils.py) : Factory de modèles (VGG/ConvNeXt)
-- [`get_data_transforms()`](src/train/utils.py) : Pipeline de preprocessing personnalisé
-- [`train_classifier_with_validation()`](src/train/utils.py) : Entraînement d'un modèle de classification avec jeu de données de validation (pour éviter l'overfitting)
-- [`eval_classifier()`](src/train/utils.py) : Évaluation des performances d'un modèle
 
 ## 🧠 Modèles Supportés
 
