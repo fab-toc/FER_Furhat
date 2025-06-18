@@ -12,20 +12,19 @@
 ## 📋 Table des Matières
 
 - [🎯 Description du Projet](#-description-du-projet)
-- [🏗️ Architecture](#-architecture)
+- [📋 Architecture](#-architecture)
 - [🚀 Installation](#-installation)
 - [🎮 Utilisation](#-utilisation)
 - [📊 Structure du Projet](#-structure-du-projet)
 - [🧠 Modèles Supportés](#-modèles-supportés)
 - [🤖 À propos de Furhat](#-à-propos-de-furhat)
-- [🔧 Configuration Avancée](#-configuration-avancée)
 - [📈 Performances](#-performances)
 
 ## 🎯 Description du Projet
 
-Ce projet vise à implémenter un **système de reconnaissance des expressions faciales en temps réel** en utilisant des méthodes de deep learning. Il capture les visages à l'aide d'une caméra puis les analyse à l'aide d'un modèle de classification d'images.
+Ce projet vise à implémenter un **système de reconnaissance des expressions faciales en temps réel** en utilisant des méthodes de deep learning. Il capture les visages à l'aide d'une caméra puis les analyse avec un modèle de classification d'images.
 
-Le modèle est entraîné sur le jeu de données ImageNet (plusieurs modèles disponibles), fine-tuné une première fois sur le jeu de données d'expressions faciales FER2013 afin de classifier des expressions faciales et non plus des objets, puis fine-tuné une nouvelle fois sur un jeu de données privé, élaboré spécialement pour le projet.
+Le modèle est entraîné sur le jeu de données ImageNet (plusieurs modèles disponibles), fine-tuné une première fois sur le jeu de données d'expressions faciales FER2013 afin de classifier des expressions faciales, puis fine-tuné une nouvelle fois sur un jeu de données privé, élaboré spécialement pour le projet.
 On fait ensuite réagir le robot humanoïde [Furhat](https://furhatrobotics.com/) en réaction à l'expression détectée, en utilisant notamment des expressions faciales disponibles sur le robot, des LED et de la synthèse vocale.
 
 ### 🎭 Expressions Reconnues
@@ -37,7 +36,7 @@ Le système peut détecter, à partir du dataset FER2013, **7 expressions facial
 - 😊 **Joie** (Happy) - LED jaune, grand sourire
 - 😢 **Tristesse** (Sad) - LED bleue, expression triste
 
-## 🏗️ Architecture
+## 📋 Architecture
 
 **Pipeline de traitement :**
 
@@ -136,7 +135,7 @@ export KAGGLE_KEY=votre_api_key
 ### 🚀 Démarrage Rapide
 
 1. **Connecter la caméra RealSense**
-2. **S'assurer que Furhat est accessible** sur le réseau et bien configuré
+2. **S'assurer que Furhat est accessible sur le réseau et bien configuré**
 3. **Lancer l'application principale** :
 
 ```bash
@@ -153,7 +152,7 @@ uv run src/train/train.py
 uv run src/train/fine-tuning.py
 ```
 
-### 🧪 Test de Modèles
+### 🧪 Test et Évaluation de Modèles
 
 ```bash
 # Test sur dataset
@@ -166,12 +165,13 @@ uv run src/test.py
 FER_Furhat/
 ├── 📁 src/                    # Code source principal
 │   ├── 🐍 main.py             # Application principale (pipeline complet de reconnaissance d'expressions faciales et réactions avec le robot)
-│   ├── 🧪 test.py             # Tests de modèles
+│   ├── 🧪 test.py             # Test et évaluation de modèles
 │   └── 📁 train/              # Scripts d'entraînement
 │       ├── 🔧 utils.py        # Fonctions utilitaires, d'entraînement, de deep learning, etc.
 │       ├── 🎯 train.py        # Entraînement d'un modèle (fine-tuning sur le dataset FER2013)
 │       └── ⚡ fine-tuning.py   # Fine-tuning sur un dataset privé
-├── 📁 trained/                # Répertoire des modèles entraînés sauvegardés (auto-généré)
+├── 📁 trained/                # Répertoire des modèles entraînés sauvegardés (auto-généré lors de la sauvegarde d'un modèle après entraînement)
+│   └── 📁 (model_name)        # Répertoire spécifique à une famille de modèles sauvegardés (auto-généré lors de la sauvegarde d'un modèle après entraînement)
 ├── 📁 dataset/                # Répertoire d'un potentiel dataset privé (à créer)
 ├── ⚙️ pyproject.toml          # Configuration du projet, des dépendances, des scripts, etc.
 ├── 🔒 .env.example            # Template variables d'environnement
@@ -209,47 +209,10 @@ BATCH_SIZE = 32               # Équilibre vitesse/mémoire
 
 ### 🔧 Configuration Réseau
 
-Par défaut, le système cherche Furhat sur `192.168.10.14:54321`. Modifiez dans `main.py` :
+Par défaut, le système cherche le robot Furhat sur `192.168.10.14:54321`. Modifiez dans `main.py` :
 
 ```python
 furhat_controller = FurhatController(host="VOTRE_IP_FURHAT")
-```
-
-## 🔧 Configuration Avancée
-
-### 🎯 Hyperparamètres d'Entraînement
-
-```python
-# Dans train.py ou fine-tuning.py
-EMOTIONS_TO_EXCLUDE = ["surprise", "neutral", "disgust"]
-AUGMENTATION_LEVEL = "heavy"    # none, light, medium, heavy
-BATCH_SIZE = 256               # Ajuster selon GPU
-EPOCHS = 15                    # Nombre d'époques
-LR = 1e-4                      # Taux d'apprentissage
-```
-
-### 🎥 Paramètres Caméra
-
-```python
-# Dans main.py
-NUM_IMAGES = 60               # Images par batch d'inférence
-cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)
-```
-
-### 🤖 Personnalisation Furhat
-
-```python
-# Messages par émotion (dans FurhatController)
-self.messages = {
-    "happy": ["Je suis heureux!", "Quelle joie!"],
-    "sad": ["Je me sens triste...", "La mélancolie me gagne."]
-}
-
-# Couleurs LED personnalisées
-self.colors = {
-    "happy": {"r": 255, "g": 255, "b": 0},  # Jaune
-    "angry": {"r": 255, "g": 0, "b": 0}     # Rouge
-}
 ```
 
 ## 📈 Performances
